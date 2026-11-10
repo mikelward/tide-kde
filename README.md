@@ -104,7 +104,8 @@ After `make install`, this sets Plasma up as tide has it:
   windows together;
 - sets KWin's focus stealing prevention to Medium, so a new window from
   another app opens behind the one you're in;
-- puts the layout widget on the first panel.
+- puts the layout widget on the first panel;
+- gives the lock screen the desktop's wallpaper, as it is then.
 
 `node scripts/setup.mjs --dry-run` says what it would change.
 
@@ -126,6 +127,13 @@ default.
 | `single` | `2.1:0.8, 3.2:0.6` | a lone window's width from each aspect up; empty to fill |
 | `dim` | `true` | turn Dim Inactive on only while a monitor shows two windows or more; `false` leaves it as Plasma's settings have it |
 | `newWindow` | `end` | where a new window goes: `end`, `top` of the stack, `next` to the focused one, or `master` |
+
+## Login and lock
+
+Log in with tide's greeter ([tide](https://github.com/mikelward/tide)'s
+`make install-session`), which lists Plasma's session beside tide's. The
+lock screen is Plasma's, with the desktop's wallpaper after `make setup`;
+tide's face on it needs a change to Plasma (SPEC.md §4.7).
 
 ## Development
 

@@ -52,7 +52,7 @@ jobs:
       - run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            ca-certificates git kwin-wayland kwin-common kpackagetool6 plasma-desktop foot qdbus-qt6 dbus python3 nodejs make
+            ca-certificates git kwin-wayland kwin-common kpackagetool6 libkf6config-bin plasma-desktop foot qdbus-qt6 dbus python3 nodejs make
       - uses: actions/checkout@v4
         with:
           persist-credentials: false

@@ -25,8 +25,10 @@
    Still to do: scripts' `setup-kde` installs tide-kde and runs it.
 10. **Done:** releases: each push to main is `v<commits>`, with
     `tide.kwinscript` and `tide-layout.plasmoid` attached.
-11. The lock screen's look: a tide look-and-feel package's `lockscreen/`
-    with the hostname, the date and time and the wallpaper (SPEC.md §4.7).
+11. The lock screen's look (SPEC.md §4.7). **Done:** setup gives it the
+    desktop's wallpaper. To do: propose kscreenlocker a setting naming the
+    package its lock screen comes from, apart from the shell's; then ship
+    tide's face, the hostname over the date and time, in one.
 12. The launcher's Workspaces and Windows tabs, served by the script
     (SPEC.md §4.6).
 13. Take over `tide-kde.service` (SPEC.md §5), with tide in step: tide
