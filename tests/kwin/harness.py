@@ -102,17 +102,28 @@ class KWinTest(unittest.TestCase):
             if r.returncode != 0:
                 raise AssertionError(f"kpackagetool6 couldn't install tide: {r.stdout}{r.stderr}")
             self.write_config({"tideEnabled": "true"}, group="Plugins")
+        self.clients = []
+        self.kwin = None
+        self.log = None
+        self.addCleanup(self.stop)
+        self.start_kwin()
+
+    def start_kwin(self):
+        """Starts KWin with the probe, and tide as LOAD says."""
         log = os.path.join(self.home, "kwin.log")
-        with open(log, "wb") as out:
+        # Where this run's lines start, counted before KWin can write any
+        before = 0
+        if os.path.exists(log):
+            with open(log, "rb") as f:
+                before = f.read().count(b"\n")
+        with open(log, "ab") as out:
             self.kwin = subprocess.Popen(
                 [KWIN, "--virtual", "--no-lockscreen", "--socket", "wayland-tide",
                  "--width", str(self.WIDTH), "--height", str(self.HEIGHT),
                  "--output-count", str(self.OUTPUTS)],
                 env=self.env, stdout=out, stderr=subprocess.STDOUT)
-        self.addCleanup(self.stop)
         self.log = Log(log)
-        self.addCleanup(self.log.close)
-        self.clients = []
+        self.log.pos = before
         self.log.wait(lambda l: "Accepting client connections" in l, "it accepts clients")
         self.wait_for_dbus()
         self.load(PROBE, "probe")
@@ -126,15 +137,22 @@ class KWinTest(unittest.TestCase):
             waiting = {w for w in waiting if w not in line}
 
     def stop(self):
+        """Stops the windows and KWin."""
         for c in self.clients:
             c.kill()
             c.wait()
-        self.kwin.terminate()
-        try:
-            self.kwin.wait(5)
-        except subprocess.TimeoutExpired:
-            self.kwin.kill()
-            self.kwin.wait()
+        self.clients = []
+        if self.kwin:
+            self.kwin.terminate()
+            try:
+                self.kwin.wait(5)
+            except subprocess.TimeoutExpired:
+                self.kwin.kill()
+                self.kwin.wait()
+            self.kwin = None
+        if self.log:
+            self.log.close()
+            self.log = None
 
     def write_config(self, entries, group="Script-tide"):
         path = os.path.join(self.home, ".config", "kwinrc")

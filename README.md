@@ -74,10 +74,32 @@ can change them.
 | `Meta+PgUp` / `Meta+PgDown` | previous / next workspace with a window |
 | `Meta+Shift+PgUp` / `Meta+Shift+PgDown` | move the window to the previous / next workspace |
 
-A key Plasma already holds stays Plasma's: `Alt+Tab` (the task switcher),
-`Meta+1…9` (the task manager's entries), `Meta+Tab` (activities),
-`Meta+Left`, `Meta+Right`, `Meta+Up` and `Meta+Down` (quick tiling) and `Meta+PgUp` and `Meta+PgDown`
-(maximize and minimize). Clear those in Shortcuts, then set tide's.
+Plasma holds some of these keys too: `Alt+Tab` and `Meta+Tab` (the task
+switcher), ``Meta+` `` (its windows of one app), `Meta+1…9` (the task
+manager's entries), `Meta+Left`, `Meta+Right`, `Meta+Up` and `Meta+Down`
+(quick tiling), `Meta+Shift+Left` and `Meta+Shift+Right` (window to
+screen), `Meta+PgUp` and `Meta+PgDown` (maximize and minimize),
+`Meta+Backspace` (restore), `Meta+0`, `Meta+=` and `Meta+-` (zoom) and
+`Meta+.` (emoji). `make setup` frees them, and tide's take over at the
+next login.
+
+## Setup
+
+    make setup
+
+After `make install`, this sets Plasma up as tide has it:
+
+- frees the Plasma keys above, keeping their others (`Alt+Shift+Tab`
+  still walks back through windows), and binds tide's, but leaves one
+  you've bound yourself;
+- turns on Dim Inactive at 15%, for every inactive app window but not
+  panels, the desktop, keep-above or fullscreen ones, nor a group's
+  windows together;
+- sets KWin's focus stealing prevention to Medium, so a new window from
+  another app opens behind the one you're in;
+- puts the layout widget on the first panel.
+
+`node scripts/setup.mjs --dry-run` says what it would change.
 
 ## Settings
 

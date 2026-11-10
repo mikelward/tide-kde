@@ -15,12 +15,14 @@
    monitors, as tide's `direction.lua`.
 6. **Done:** the dim: Dim Inactive, off with one window (SPEC.md §4.2).
    Its strength and `DimByGroup=false` go in setup (9).
-7. The focus guard: KWin's prevention level, and what tide §14.1 needs
-   beyond it (SPEC.md §4.4).
+7. **Done, in part:** the focus guard is KWin's prevention at Medium, set
+   by setup (9). What tide §14.1 needs beyond it, launches and terminals,
+   isn't done (SPEC.md §4.4).
 8. **Done:** the layout widget: a plasmoid with each monitor's layout
    symbol (SPEC.md §4.7). Setup (9) adds it to the panel.
-9. Setup: free Plasma's keys that tide's take (README.md's Keys), set the
-   dim and focus settings, and install tide-kde from scripts' `setup-kde`.
+9. **Done:** `make setup`: frees Plasma's keys that tide's take, binds
+   tide's, sets the dim and focus settings, and adds the layout widget.
+   Still to do: scripts' `setup-kde` installs tide-kde and runs it.
 10. Releases: tag each push to main `v<commits>` and attach
     `tide.kwinscript`.
 11. The lock screen's look: a tide look-and-feel package's `lockscreen/`
