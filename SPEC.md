@@ -128,7 +128,7 @@ Status: **yes**, **partial**, **no**, or **differs** (done another way).
 
 | Feature | Status | How |
 |---|---|---|
-| New windows from other apps don't take focus | partial | KWin's focus stealing prevention at Medium or High covers most of tide §14.1. tide's rules for launches, terminals and polkit aren't KWin's |
+| New windows from other apps don't take focus | partial | KWin's focus stealing prevention at Medium, which `make setup` sets, covers most of tide §14.1: a new window from the app you're in takes focus, one from another app doesn't. tide's rules for launches, terminals and polkit aren't KWin's |
 | Mark such a window urgent | yes | KWin does it with the prevention on *(unverified)* |
 | A launch from tide's launcher takes focus | partial | KWin trusts an activation token *(unverified)*; the launcher passes one if Quickshell does |
 
@@ -137,7 +137,7 @@ Status: **yes**, **partial**, **no**, or **differs** (done another way).
 | Feature | Status | How |
 |---|---|---|
 | tide's window and workspace keys | yes | `registerShortcut`, under `Meta` |
-| A key Plasma already has | differs | KGlobalAccel won't take a bound key; `setup` frees Plasma's first, as `setup-kde` does for `Meta+Space` |
+| A key Plasma already has | yes | KGlobalAccel gives the key to both, and a press reaches one of them. `make setup` (`scripts/setup.mjs`) takes Plasma's off it in `kglobalshortcutsrc`, keeping their other keys, and binds tide's; KGlobalAccel reads them as the session starts |
 | `keep_open`: an app's close key doesn't close it | no | A script can't take an app's own keys, or veto a close (§2) |
 
 ### 4.6 Launcher (tide §8)

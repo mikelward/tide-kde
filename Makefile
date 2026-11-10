@@ -11,6 +11,9 @@
 #                     and dist/tide-layout.plasmoid, the layout widget
 #   make install      install both for this user, turn the script on, and
 #                     have KWin load it; `make uninstall` takes them out
+#   make setup        free Plasma's keys that tide's take, set the dim and
+#                     focus stealing prevention, and put the layout widget
+#                     on the panel (scripts/setup.mjs)
 
 TIDECO ?= ../tideco
 SCRIPT = package/contents/code/main.js
@@ -25,9 +28,10 @@ TESTS = \
 	src/settings_test.js \
 	src/tide_test.js \
 	src/workspaces_test.js \
-	scripts/bundle_test.mjs
+	scripts/bundle_test.mjs \
+	scripts/setup_test.mjs
 
-.PHONY: all lint test test-kwin check-tideco dist install uninstall version unshallow-check clean
+.PHONY: all lint test test-kwin check-tideco dist install uninstall setup version unshallow-check clean
 
 all: $(SCRIPT)
 
@@ -77,6 +81,9 @@ install: $(SCRIPT)
 	kpackagetool6 --type Plasma/Applet --upgrade plasmoid 2>/dev/null || kpackagetool6 --type Plasma/Applet --install plasmoid
 	kwriteconfig6 --file kwinrc --group Plugins --key tideEnabled true
 	qdbus6 org.kde.KWin /KWin reconfigure
+
+setup:
+	node scripts/setup.mjs
 
 uninstall:
 	kwriteconfig6 --file kwinrc --group Plugins --key tideEnabled false
