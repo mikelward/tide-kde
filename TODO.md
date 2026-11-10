@@ -11,8 +11,8 @@
 3. **Done:** keys through `registerShortcut` (README.md).
 4. **Done:** workspaces: home, the standing ones made on demand, made ones
    removed when left empty, and their keys (SPEC.md §4.3).
-5. `Meta+Left` and `Meta+Right`: focus and move by side, across monitors,
-   as tide's `direction.lua`.
+5. **Done:** `Meta+Left` and `Meta+Right`: focus and move by side, across
+   monitors, as tide's `direction.lua`.
 6. The dim: Dim Inactive at tide's strength, off with one window
    (SPEC.md §4.2).
 7. The focus guard: KWin's prevention level, and what tide §14.1 needs

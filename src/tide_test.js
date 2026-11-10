@@ -249,3 +249,60 @@ test("a window on another activity takes no tile", () => {
   ws.currentActivity = "a2";
   assert.deepEqual(box(b), [0, 0, 1920, 1080]);
 });
+
+function pairOfMonitors() {
+  return {
+    outputs: [
+      { name: "A", x: 0, y: 0, width: 1920, height: 1080 },
+      { name: "B", x: 1920, y: 0, width: 1920, height: 1080 },
+    ],
+  };
+}
+
+test("left and right focus across windows, then monitors", () => {
+  const { ws, env } = start(pairOfMonitors());
+  const a1 = ws.open();
+  const a2 = ws.open();
+  ws.activeScreen = ws.screens[1];
+  const b1 = ws.open();
+  ws.activeWindow = a1;
+  env.press("tide-focus-right");
+  assert.equal(ws.activeWindow, a2);
+  env.press("tide-focus-right");
+  assert.equal(ws.activeWindow, b1);
+  env.press("tide-focus-right");
+  assert.equal(ws.activeWindow, b1, "nothing past the last monitor");
+});
+
+test("moving right swaps on the monitor, then lands on the next one's near edge", () => {
+  const { ws, env } = start(pairOfMonitors());
+  const a1 = ws.open();
+  const a2 = ws.open();
+  ws.activeScreen = ws.screens[1];
+  const b1 = ws.open();
+  ws.activeWindow = a1;
+  env.press("tide-move-right");
+  assert.deepEqual([box(a2), box(a1)], [[0, 0, 1056, 1080], [1056, 0, 864, 1080]]);
+  env.press("tide-move-right");
+  assert.equal(a1.output.name, "B");
+  // It came in by B's left edge, so it's B's master
+  assert.deepEqual([box(a1), box(b1), box(a2)], [[1920, 0, 1056, 1080], [2976, 0, 864, 1080], [0, 0, 1920, 1080]]);
+});
+
+test("a floating window moves to the same spot on the next monitor", () => {
+  const { ws, env } = start(pairOfMonitors());
+  ws.open();
+  const f = ws.open();
+  env.press("tide-float");
+  f.frameGeometry = { x: 96, y: 54, width: 400, height: 300 };
+  env.press("tide-move-right");
+  assert.equal(f.output.name, "B");
+  assert.deepEqual(box(f), [2016, 54, 400, 300]);
+});
+
+test("right from an empty monitor's edge focuses the next monitor", () => {
+  const { ws, env } = start(pairOfMonitors());
+  ws.activeWindow = null;
+  env.press("tide-focus-right");
+  assert.equal(ws.activeScreen.name, "B");
+});

@@ -168,6 +168,21 @@ class WorkspaceTest(KWinTest):
         self.assertEqual(s["current"], "re")
 
 
+class TwoMonitorTest(KWinTest):
+    """Two 1920x1080 monitors side by side"""
+    OUTPUTS = 2
+
+    def test_moving_right_lands_on_the_next_monitor(self):
+        self.open("one")
+        self.open("two")
+        self.settled({"one": (0, 0, 1056, 1080), "two": (1056, 0, 864, 1080)})
+        s = self.key("tide-move-right")
+        self.assertEqual(s["windows"]["two"]["output"], "Virtual-1", s)
+        self.settled({"one": (0, 0, 1920, 1080), "two": (1920, 0, 1920, 1080)})
+        s = self.key("tide-focus-left")
+        self.assertTrue(s["windows"]["one"]["active"], s)
+
+
 class InstallTest(KWinTest):
     """Installed as a user does: kpackagetool6, then on in kwinrc"""
     LOAD = "install"
