@@ -1,7 +1,8 @@
 # tide-kde: tide on KDE Plasma
 
-**Status: exploration.** This explores what KWin allows. It doesn't yet
-decide what tide-kde is. It takes what tide for Linux does under Hyprland
+**Status: the basics are built:** the layouts, the mouse, floating, the
+workspaces and their keys, and settings (§4). The rest of this explores
+what KWin allows. It takes what tide for Linux does under Hyprland
 ([mikelward/tide](https://github.com/mikelward/tide)), and what tidewm and
 tidesway carry of it in their compositors
 ([mikelward/tidewm](https://github.com/mikelward/tidewm),
@@ -32,9 +33,20 @@ are marked *(unverified)*. References like "tide §6.1" are to tide's
 
 KWin 6 runs scripts in JavaScript or QML, packaged with a
 `metadata.json` and installed with `kpackagetool6 --type KWin/Script`
-*(unverified: the type's name)*. A script sees and moves every window. It
-can't draw outside QML, can't veto a close, and can't take a key an app
-asks for.
+(tested in CI, §6). A script sees and moves every window. It can't draw
+outside QML, can't veto a close, and can't take a key an app asks for.
+
+A script's settings are its group in `kwinrc`, `[Script-<id>]`, which
+`readConfig(key, default)` reads; with no default it gives nothing, even
+for a key that's set. A script can't read other files, so tide's
+`layouts.json` (tide §16) can't reach it: its settings are its own
+(README.md).
+
+KWin's script engine is Qt's QV4. A headless KWin 6.7.5 shows what it
+lacks of what Node runs: object spread fails to load, `\p{...}` in a
+regular expression matches nothing, and there's no `Object.fromEntries`
+or class fields. ES modules don't load either, so `scripts/bundle.mjs`
+joins `src/` into one script, and refuses what QV4 can't run.
 
 What KWin 6.7.5's script API has, by the names in `libkwin.so`:
 
@@ -136,11 +148,26 @@ Status: **yes**, **partial**, **no**, or **differs** (done another way).
 | Workspaces and Windows | yes | The script answers the launcher over D-Bus: `callDBus` out, a D-Bus service of the script's own in *(unverified: a script owning a name)*, or a QML script's |
 | Attention | partial | Urgent windows from the script; Plasma's notifications stay its own |
 
-### 4.7 The rest
+### 4.7 Bar, login and lock
 
-The bar, notifications, idle, lock, login, screenshots and the theme stay
-Plasma's. Their tide versions (tide §7, §9 to §13, §15) need a session
-Plasma doesn't share.
+- **The bar** is Plasma's panel, to start with: its Pager shows the
+  workspaces by name. tide's own bar could run on Plasma later, fed by
+  the script over D-Bus as a third backend beside Hyprland's and
+  tidewm's (tide `shell/Compositor.qml`), but that's much more work.
+- **The layout symbol** goes in a panel widget of its own, a plasmoid
+  showing `[]=`, `|M|`, `||=` or `[M]` for the focused monitor, as tide's
+  bar does. A click is the next layout.
+- **Login** is tide's greeter (tide §11), which already lists every
+  session greetd can start, Plasma's among them. An SDDM theme could
+  match it, but needn't.
+- **Lock** stays Plasma's lock screen, which keeps its security. It
+  takes its look from the global theme's `lockscreen/` QML, so a tide
+  look-and-feel package can give it tide's face: the hostname, the date
+  and time, and the wallpaper. What QML can't reach, a patch to
+  Plasma could add.
+- **Notifications, idle, screenshots and the theme** stay Plasma's.
+  Their tide versions (tide §9, §10, §13, §15) need a session Plasma
+  doesn't share.
 
 ## 5. `tide-kde.service`
 
@@ -164,11 +191,17 @@ tide-kde supersedes tide's Plasma launcher, and takes over its unit's name.
 - **Geometry** is pure JavaScript, free of KWin's API, as tide's Lua is
   free of Hyprland's. `node --test` runs it here, against tide's layout
   numbers.
-- **Against KWin.** `kwin_wayland --virtual` renders to a virtual
-  framebuffer, so a headless KWin can load the script and open test
-  windows *(unverified: whether it runs in CI's container)*. Ubuntu's
-  devel release packages KWin 6.7.5; Debian testing has no
-  `kwin-wayland` package now.
+- **tide.js** runs on a fake KWin (`src/fake_kwin.js`) for what a
+  headless KWin can't be made to do, such as a drag.
+- **Against KWin.** `make test-kwin` runs a headless `kwin_wayland
+  --virtual` per test, with the script loaded over D-Bus or installed as
+  a user would. It opens foot windows, presses tide's keys through
+  KGlobalAccel's `invokeShortcut`, and reads what a probe script prints
+  to KWin's log. CI runs it in Ubuntu's devel release, which packages
+  KWin 6.7.5; Debian testing has no `kwin-wayland` package now.
+  - A container can't grant `kwin_wayland` its `CAP_SYS_NICE`, so the
+    kernel won't run it there. A copy without the capability runs, if it
+    keeps its name: KWin's own platform plugin checks it.
 - **The launcher's** tests stay in tide.
 
 ## 7. Open questions
@@ -176,14 +209,12 @@ tide-kde supersedes tide's Plasma launcher, and takes over its unit's name.
 1. **The launcher's home.** Run tide's installed config (no copy, but
    tide-kde needs tide installed), or carry a copy checked against tide's,
    as tidemo's `make check-tide` does?
-2. **JavaScript or QML.** A QML script can draw, and may own a D-Bus name
-   more easily, for the launcher's Workspaces and Windows tabs. A
-   JavaScript one is simpler to test.
-3. **Krohnkite's code.** Its layouts are MIT-licensed *(unverified)*.
-   Borrow its KWin glue, or write ours from tide's numbers?
-4. **The focus guard.** Is KWin's prevention at Medium close enough to
+2. **How the script talks to others.** A script can call D-Bus but not
+   answer it, so the launcher's Workspaces and Windows tabs and the
+   layout widget need it to call them, or a helper that holds a name.
+3. **The focus guard.** Is KWin's prevention at Medium close enough to
    tide §14.1, or does the script need its own rules on `windowAdded`?
-5. **`keep_open`.** Without it, `Ctrl+Q` closes a browser on Plasma. Say
+4. **`keep_open`.** Without it, `Ctrl+Q` closes a browser on Plasma. Say
    so, or ask KWin upstream for a veto?
 
 ## Sources

@@ -115,11 +115,14 @@ Shared by every mikelward repo and the user-level agent config; canonical in mik
 
 ## Project
 
-- **Status**. Exploration: `SPEC.md` scopes it, and nothing is built yet.
-- **JavaScript**. KWin's script engine (QJSEngine) runs it: no Node APIs, no modules.
-  Keep geometry free of KWin's API, as tide keeps its Lua free of Hyprland's, so
-  `node --test` can run it here.
+- **Status**. The basics are built; `TODO.md` has the rest.
+- **JavaScript**. `src/` is ES modules, which `scripts/bundle.mjs` joins into the one
+  script KWin's engine (QV4) runs; it refuses what QV4 lacks (SPEC.md §2). No Node
+  APIs outside tests. Keep KWin's API in `tide.js`, so the rest tests in plain Node.
 - **KWin claims**. Checked against KWin 6's source or a running `kwin_wayland`; mark
   the rest *(unverified)*, as `SPEC.md` does.
-- **KWin**. It can't run on a desktop here; a headless `kwin_wayland --virtual` may.
-  Say what only stubs tested.
+- **Tests**. `make lint test` (Node) and `make test-kwin` (a headless `kwin_wayland`,
+  `tests/kwin/`); every `*_test.js` must be listed in the `Makefile`. `make
+  check-tideco` compares the copied geometry with tide for Chrome's.
+- **KWin**. Only a headless one runs here, in a container from `ubuntu:devel` (CI's
+  `kwin` job says how). Say what only the fake KWin (`src/fake_kwin.js`) tested.
