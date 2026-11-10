@@ -47,6 +47,9 @@ export class Tide {
     this.landings = new Map();
     this.config = layout.DEFAULTS;
     this.standing = workspaces.DEFAULT_STANDING;
+    this.dim = true;
+    // Whether Dim Inactive is loaded, as tide last asked; null before it has.
+    this.dimLoaded = null;
   }
 
   log(text) {
@@ -87,6 +90,7 @@ export class Tide {
     const loaded = settings.load(read);
     this.config = loaded.config;
     this.standing = loaded.standing;
+    this.dim = loaded.dim;
     for (const e of loaded.errors) this.problem(`setting ${e}; using its default`);
 
     this.ensureHome();
@@ -101,7 +105,9 @@ export class Tide {
     for (const k of KEYS) {
       this.env.registerShortcut(k.name, `tide: ${k.title}`, k.key, () => this.run(k));
     }
+    this.ws.windowActivated?.connect(() => this.updateDim());
     this.relayoutAll();
+    this.updateDim();
     this.log("started");
   }
 
@@ -226,6 +232,8 @@ export class Tide {
     }
     if (was !== undefined && was !== key) this.relayout(was);
     if (key !== null) this.relayout(key);
+    // A window on every desktop has no part to relayout, but counts for the dim
+    else this.updateDim();
   }
 
   removed(w) {
@@ -238,6 +246,8 @@ export class Tide {
     if (key !== undefined) {
       layout.remove(this.parts.get(key), id);
       this.relayout(key);
+    } else {
+      this.updateDim();
     }
   }
 
@@ -271,6 +281,7 @@ export class Tide {
   }
 
   relayout(key) {
+    this.updateDim();
     const output = this.outputOf(key);
     const desktop = this.desktopOf(key);
     if (!output || !desktop) return;
@@ -287,6 +298,39 @@ export class Tide {
 
   relayoutAll() {
     for (const key of new Set(this.placed.values())) this.relayout(key);
+  }
+
+  // --- The dim (SPEC.md §4.2) ---------------------------------------------
+
+  // KWin's Dim Inactive dims every inactive window, so tide has it on only
+  // while some monitor shows two windows or more: with one apiece there's
+  // nothing to tell apart, and a dimmed lone window just looks wrong (tide
+  // SPEC.md §6.2). With `dim` false, tide leaves it as Plasma's settings
+  // have it.
+  updateDim() {
+    if (!this.dim) return;
+    const desktop = this.ws.currentDesktop;
+    const shown = new Map();
+    for (const w of this.ws.windowList()) {
+      if (!this.candidate(w) || w.minimized || !w.output || !this.onActivity(w)) continue;
+      // A window on every desktop has none listed
+      const desktops = w.desktops ?? [];
+      if (desktops.length > 0 && !desktops.some((d) => d.id === desktop.id)) continue;
+      shown.set(w.output.name, (shown.get(w.output.name) ?? 0) + 1);
+    }
+    const want = [...shown.values()].some((n) => n >= 2);
+    if (want === this.dimLoaded) return;
+    this.dimLoaded = want;
+    const method = want ? "loadEffect" : "unloadEffect";
+    try {
+      this.env.callDBus("org.kde.KWin", "/Effects", "org.kde.kwin.Effects", method, "diminactive", (ok) => {
+        if (want && ok === false) this.log("KWin couldn't load Dim Inactive, so nothing dims");
+        else this.log(`dim ${want ? "on" : "off"}`);
+      });
+    } catch (e) {
+      this.log(`couldn't ${want ? "turn on" : "turn off"} Dim Inactive (${e}), so the dim may be wrong`);
+      this.dimLoaded = null;
+    }
   }
 
   // --- Dragging (tide SPEC.md §6.6) ---------------------------------------

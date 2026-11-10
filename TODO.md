@@ -13,8 +13,8 @@
    removed when left empty, and their keys (SPEC.md §4.3).
 5. **Done:** `Meta+Left` and `Meta+Right`: focus and move by side, across
    monitors, as tide's `direction.lua`.
-6. The dim: Dim Inactive at tide's strength, off with one window
-   (SPEC.md §4.2).
+6. **Done:** the dim: Dim Inactive, off with one window (SPEC.md §4.2).
+   Its strength and `DimByGroup=false` go in setup (9).
 7. The focus guard: KWin's prevention level, and what tide §14.1 needs
    beyond it (SPEC.md §4.4).
 8. The layout widget: a plasmoid with the focused monitor's layout symbol

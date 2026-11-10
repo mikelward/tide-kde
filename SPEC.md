@@ -109,9 +109,9 @@ Status: **yes**, **partial**, **no**, or **differs** (done another way).
 
 | Feature | Status | How |
 |---|---|---|
-| Dim inactive windows | yes | Dim Inactive, at tide's strength. tide §6.2 found KDE's dim looks weaker than Hyprland's at the same number |
-| No dim with one window | partial | Dim Inactive has no such rule *(unverified)*; the script may toggle the effect over D-Bus as windows come and go |
-| `nodim` for video and calls | partial | The same, or a window rule if Dim Inactive honors one *(unverified)* |
+| Dim inactive windows | yes | Dim Inactive, at a strength set in its settings (`[Effect-diminactive]` `Strength`, a percentage). tide §6.2 found KDE's dim looks weaker than Hyprland's at the same number |
+| No dim with one window | differs | The effect is all or nothing, so the script loads it only while some monitor shows two windows or more, and unloads it otherwise, over KWin's own D-Bus (`org.kde.kwin.Effects`). A lone window on one monitor dims while the other monitor shows two |
+| `nodim` for video and calls | no | Dim Inactive has no rule for a window; it leaves out panels, the desktop, keep-above and fullscreen windows by its own settings |
 
 ### 4.3 Workspaces and monitors (tide §6.5, §6.7)
 

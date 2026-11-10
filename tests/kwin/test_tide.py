@@ -183,6 +183,23 @@ class TwoMonitorTest(KWinTest):
         self.assertTrue(s["windows"]["one"]["active"], s)
 
 
+class DimTest(KWinTest):
+    def dim(self):
+        return self.qdbus("org.kde.KWin", "/Effects", "org.kde.kwin.Effects.isEffectLoaded", "diminactive")
+
+    def test_dim_inactive_is_on_only_with_two_windows_on_a_monitor(self):
+        self.assertEqual(self.dim(), "false")
+        mark = self.log.mark()
+        self.open("one")
+        self.open("two")
+        self.log.wait(lambda l: "tide: dim on" in l, "the dim went on", since=mark)
+        self.assertEqual(self.dim(), "true")
+        mark = self.log.mark()
+        self.key("tide-minimize")
+        self.log.wait(lambda l: "tide: dim off" in l, "the dim went off", since=mark)
+        self.assertEqual(self.dim(), "false")
+
+
 class InstallTest(KWinTest):
     """Installed as a user does: kpackagetool6, then on in kwinrc"""
     LOAD = "install"
@@ -197,10 +214,8 @@ class SettingsTest(KWinTest):
     CONFIG = {"tileMfact": "2", "normalMode": "monocle"}
 
     def test_a_bad_setting_is_named_and_the_rest_apply(self):
-        # The harness has read past tide's start, so look for it from the top
-        with open(self.log.file.name, encoding="utf-8", errors="replace") as f:
-            log = f.read()
-        self.assertIn("setting tileMfact must be a number from 0.1 to 0.9", log)
+        self.log.wait(lambda l: "setting tileMfact must be a number from 0.1 to 0.9" in l,
+                      "the bad setting", since=0)
         self.open("one")
         self.open("two")
         whole = (0, 0, 1920, 1080)
