@@ -134,6 +134,12 @@ export class FakeWorkspace {
     this._activity = a;
     this.currentActivityChanged.emit(a);
   }
+  screenAt(pos) {
+    return this.screens.find((o) => {
+      const g = o.geometry;
+      return pos.x >= g.x && pos.x < g.x + g.width && pos.y >= g.y && pos.y < g.y + g.height;
+    }) ?? null;
+  }
   windowList() {
     return [...this.windows];
   }

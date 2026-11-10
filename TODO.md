@@ -17,8 +17,8 @@
    Its strength and `DimByGroup=false` go in setup (9).
 7. The focus guard: KWin's prevention level, and what tide §14.1 needs
    beyond it (SPEC.md §4.4).
-8. The layout widget: a plasmoid with the focused monitor's layout symbol
-   (SPEC.md §4.7).
+8. **Done:** the layout widget: a plasmoid with each monitor's layout
+   symbol (SPEC.md §4.7). Setup (9) adds it to the panel.
 9. Setup: free Plasma's keys that tide's take (README.md's Keys), set the
    dim and focus settings, and install tide-kde from scripts' `setup-kde`.
 10. Releases: tag each push to main `v<commits>` and attach

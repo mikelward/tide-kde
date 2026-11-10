@@ -344,3 +344,43 @@ test("with dim false, tide leaves Dim Inactive alone", () => {
   ws.open();
   assert.deepEqual(effects(env), []);
 });
+
+function announced(env) {
+  const calls = env.calls.filter((c) => c[3] === "evaluateScript");
+  if (calls.length === 0) return null;
+  const m = /writeConfig\("layouts", ("(?:[^"\\]|\\.)*")\)/.exec(calls.at(-1)[4]);
+  return JSON.parse(JSON.parse(m[1]));
+}
+
+test("the layout widget hears each monitor's layout as it changes", () => {
+  const { ws, env } = start({
+    outputs: [
+      { name: "A", x: 0, y: 0, width: 1920, height: 1080 },
+      { name: "B", x: 1920, y: 0, width: 3440, height: 1440 },
+    ],
+  });
+  assert.deepEqual(announced(env), { A: { symbol: "[]=", mode: "tile" }, B: { symbol: "|M|", mode: "threecol" } });
+  ws.open();
+  ws.open();
+  env.press("tide-monocle");
+  assert.deepEqual(announced(env).A, { symbol: "[1]", mode: "monocle" });
+  const count = env.calls.length;
+  env.press("tide-focus-down");
+  assert.equal(env.calls.length, count, "nothing new, nothing written");
+});
+
+test("a widget that asks hears the layouts again", () => {
+  const { env } = start();
+  const count = env.calls.length;
+  env.press("tide-announce");
+  assert.equal(env.calls.length, count + 1);
+  assert.deepEqual(announced(env), { "out-1": { symbol: "[]=", mode: "tile" } });
+});
+
+test("a click on a monitor's widget changes that monitor's layout", () => {
+  const { ws, env } = start(pairOfMonitors());
+  ws.open();
+  ws.cursorPos = { x: 2500, y: 10 };
+  env.press("tide-next-layout-here");
+  assert.deepEqual(announced(env), { A: { symbol: "[]=", mode: "tile" }, B: { symbol: "|M|", mode: "threecol" } });
+});
