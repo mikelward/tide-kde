@@ -1,7 +1,7 @@
 // Sets Plasma up for tide (README.md's Setup): frees the Plasma shortcuts
 // tide's keys take and binds tide's, sets the dim and focus stealing
-// prevention, turns the script on, and puts the layout widget on the first
-// panel. `make setup` runs it; scripts' setup-kde can.
+// prevention, turns the script on, puts the layout widget on the first
+// panel, and gives the lock screen the desktop's wallpaper. `make setup` runs it; scripts' setup-kde can.
 //
 //   node scripts/setup.mjs [--dry-run]
 //
@@ -47,6 +47,22 @@ export const KWINRC = [
   ["Effect-diminactive", "DimFullScreen", "false"],
   ["Windows", "FocusStealingPreventionLevel", "2"],
 ];
+
+// Prints the first desktop's wallpaper, as Plasma's image wallpaper keeps
+// it, or nothing for another kind.
+export const WALLPAPER_SCRIPT =
+  'const d = desktops()[0]; if (d && d.wallpaperPlugin === "org.kde.image") {' +
+  ' d.currentConfigGroup = ["Wallpaper", "org.kde.image", "General"]; print(d.readConfig("Image")); }';
+
+// The lock screen's wallpaper, as its settings keep it: the desktop's image.
+export function lockWallpaper(image) {
+  if (!image) return [];
+  const groups = ["Greeter", "Wallpaper", "org.kde.image", "General"];
+  return [
+    { file: "kscreenlockerrc", groups: ["Greeter"], key: "WallpaperPlugin", value: "org.kde.image" },
+    { file: "kscreenlockerrc", groups, key: "Image", value: image },
+  ];
+}
 
 // Puts the layout widget on the first panel, unless one has it.
 export const WIDGET_SCRIPT =
@@ -125,10 +141,17 @@ function main() {
     const v = run("kreadconfig6", ["--file", file, "--group", group, "--key", key]).replace(/\n$/, "");
     return v === "" ? null : v;
   };
-  const writes = plan(read);
+  let image = null;
+  try {
+    image = run("qdbus6", ["org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript", WALLPAPER_SCRIPT]).trim();
+  } catch (e) {
+    console.error(`couldn't ask Plasma for the desktop's wallpaper (${e.stderr || e.message}), so the lock screen keeps its own`);
+  }
+  const writes = plan(read).map((w) => ({ ...w, groups: [w.group] }));
+  writes.push(...lockWallpaper(image));
   for (const w of writes) {
-    console.log(`${w.file} [${w.group}] ${w.key}=${w.value.replace(/\t/g, "\\t")}`);
-    if (!dry) run("kwriteconfig6", ["--file", w.file, "--group", w.group, "--key", w.key, w.value]);
+    console.log(`${w.file} [${w.groups.join("][")}] ${w.key}=${w.value.replace(/\t/g, "\\t")}`);
+    if (!dry) run("kwriteconfig6", ["--file", w.file, ...w.groups.flatMap((g) => ["--group", g]), "--key", w.key, w.value]);
   }
   if (dry) return;
   try {

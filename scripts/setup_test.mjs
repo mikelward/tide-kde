@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { KEYS } from "../src/keys.js";
-import { formatEntry, parseEntry, plan } from "./setup.mjs";
+import { formatEntry, lockWallpaper, parseEntry, plan } from "./setup.mjs";
 
 // Plasma 6.7's own bindings, as its kglobalshortcutsrc has them.
 const PLASMA = {
@@ -71,4 +71,12 @@ test("run again, it writes nothing more", () => {
   const config = { ...PLASMA };
   for (const [k, v] of writes(config)) config[k] = v;
   assert.deepEqual([...writes(config).keys()], []);
+});
+
+test("the lock screen gets the desktop's image, and nothing without one", () => {
+  assert.deepEqual(lockWallpaper("file:///pictures/sea.jpg"), [
+    { file: "kscreenlockerrc", groups: ["Greeter"], key: "WallpaperPlugin", value: "org.kde.image" },
+    { file: "kscreenlockerrc", groups: ["Greeter", "Wallpaper", "org.kde.image", "General"], key: "Image", value: "file:///pictures/sea.jpg" },
+  ]);
+  assert.deepEqual(lockWallpaper(""), []);
 });

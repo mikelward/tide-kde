@@ -169,13 +169,25 @@ Status: **yes**, **partial**, **no**, or **differs** (done another way).
     the same way.
 - **Login** is tide's greeter (tide §11), which already lists every
   session greetd can start, Plasma's among them. An SDDM theme could
-  match it, but needn't.
-- **Lock** stays Plasma's lock screen, which keeps its security. It
-  takes its look from the global theme's `lockscreen/` QML, so a tide
-  look-and-feel package can give it tide's face: the hostname, the date
-  and time, and the wallpaper. What QML can't reach, a patch to
-  Plasma could add.
-- **Notifications, idle, screenshots and the theme** stay Plasma's.
+  match it, but needn't. Plasma's Switch User asks the display manager
+  over D-Bus, which greetd doesn't answer *(unverified)*.
+- **Lock** stays Plasma's lock screen, which keeps its security.
+  - **The wallpaper** is its own setting, so `make setup` gives it the
+    desktop's: plasmashell's scripting reads the first desktop's image,
+    and `kscreenlockerrc`'s `[Greeter][Wallpaper][org.kde.image][General]`
+    `Image` takes it. It doesn't follow a later change.
+  - **The face**, tide's hostname over the date and time (tide §11),
+    needs Plasma changed. The greeter loads `lockscreen/LockScreen.qml`
+    from the Plasma shell package (kscreenlocker's
+    `UnlockApp::setShell`), which `plasmashellrc`'s `[Shell]`
+    `ShellPackage` names, or else `PLASMA_DEFAULT_SHELL`. Both choose
+    plasmashell's shell too, and a shell of another name keeps its own
+    panels, so a tide package there would lose yours. Tested in a
+    headless KWin: a shell package of tide's own loads in the greeter
+    either way, and `kscreenlockerrc` names none.
+  - So the way in is upstream: a `kscreenlockerrc` setting naming the
+    package the greeter takes its lock screen from, falling back to the
+    shell's. Until then, Plasma's own face shows.- **Notifications, idle, screenshots and the theme** stay Plasma's.
   Their tide versions (tide §9, §10, §13, §15) need a session Plasma
   doesn't share.
 
