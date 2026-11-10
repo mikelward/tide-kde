@@ -34,7 +34,14 @@ launcher on Plasma and take over its `tide-kde.service` (SPEC.md §5).
 
 ## Install
 
-From a checkout, with Node for the build:
+Each push to main is a release, v<the commit count>, with the script,
+`tide.kwinscript`, and the layout widget, `tide-layout.plasmoid`. Install
+the script in System Settings → Window Management → KWin Scripts →
+Install from File, and turn it on there; install the widget from Add
+Widgets → Get New → Install Widget From Local File. Then run
+`make setup` from a checkout of the same tag (Setup, below).
+
+Or from a checkout, with Node for the build:
 
     make install
 

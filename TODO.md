@@ -23,8 +23,8 @@
 9. **Done:** `make setup`: frees Plasma's keys that tide's take, binds
    tide's, sets the dim and focus settings, and adds the layout widget.
    Still to do: scripts' `setup-kde` installs tide-kde and runs it.
-10. Releases: tag each push to main `v<commits>` and attach
-    `tide.kwinscript`.
+10. **Done:** releases: each push to main is `v<commits>`, with
+    `tide.kwinscript` and `tide-layout.plasmoid` attached.
 11. The lock screen's look: a tide look-and-feel package's `lockscreen/`
     with the hostname, the date and time and the wallpaper (SPEC.md §4.7).
 12. The launcher's Workspaces and Windows tabs, served by the script
