@@ -1,0 +1,16 @@
+{
+    "KPackageStructure": "KWin/Script",
+    "KPlugin": {
+        "Category": "Window Management",
+        "Description": "tide's tiling layouts, workspaces and keys",
+        "EnabledByDefault": false,
+        "Icon": "preferences-system-windows-effect-tiling",
+        "Id": "tide",
+        "License": "Apache-2.0",
+        "Name": "tide",
+        "Version": "0",
+        "Website": "https://github.com/mikelward/tide-kde"
+    },
+    "X-Plasma-API": "javascript",
+    "X-Plasma-MainScript": "code/main.js"
+}

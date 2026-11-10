@@ -1,0 +1,46 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: mikelward/tideco
+          path: tideco
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: make lint
+      - run: make test
+      - run: make check-tideco TIDECO=tideco
+  # The script in a real, headless KWin. Ubuntu's devel release packages
+  # KWin 6; Debian testing has no kwin-wayland.
+  kwin:
+    runs-on: ubuntu-latest
+    container: ubuntu:devel
+    steps:
+      - run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates git kwin-wayland kwin-common kpackagetool6 foot qdbus-qt6 dbus python3 nodejs make
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      # kwin_wayland asks for CAP_SYS_NICE, which a container can't grant,
+      # so the kernel won't run it; a copy without the capability runs. It
+      # keeps its name, which KWin's own platform plugin checks.
+      - run: install -D /usr/bin/kwin_wayland /opt/kwin/kwin_wayland
+      - run: make test-kwin
+        env:
+          KWIN: /opt/kwin/kwin_wayland
+          LANG: C.UTF-8
