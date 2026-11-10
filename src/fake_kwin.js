@@ -149,6 +149,15 @@ export class FakeWorkspace {
     this.desktops = this.desktops.filter((x) => x !== d);
     this.desktopsChanged.emit();
   }
+  sendClientToScreen(w, output) {
+    w.setOutput(output);
+  }
+  slotSwitchToRightScreen() {
+    this.activeScreen = this.screens[Math.min(this.screens.indexOf(this.activeScreen) + 1, this.screens.length - 1)];
+  }
+  slotSwitchToLeftScreen() {
+    this.activeScreen = this.screens[Math.max(this.screens.indexOf(this.activeScreen) - 1, 0)];
+  }
   open(props = {}) {
     const w = new FakeWindow(this, props);
     this.windows.push(w);

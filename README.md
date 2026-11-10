@@ -46,6 +46,8 @@ can change them.
 |---|---|
 | `Meta+J` / `Meta+K` | focus the next / previous window in the stack |
 | `Meta+Shift+J` / `Meta+Shift+K` | move the window down / up the stack |
+| `Meta+Left` / `Meta+Right` | focus the window that way; at a monitor's edge, the nearest on the next monitor |
+| `Meta+Shift+Left` / `Meta+Shift+Right` | move the window that way: swap on the monitor, or onto the next one, landing at the edge it came in by |
 | `Alt+Tab` | make the window the master; on the master, swap with the one before |
 | `Meta+\` / `Meta+/` | grow / shrink the master |
 | `Meta+=` / `Meta+-` | add / remove a master |
@@ -65,7 +67,7 @@ can change them.
 
 A key Plasma already holds stays Plasma's: `Alt+Tab` (the task switcher),
 `Meta+1…9` (the task manager's entries), `Meta+Tab` (activities),
-`Meta+Up` and `Meta+Down` (quick tiling) and `Meta+PgUp` and `Meta+PgDown`
+`Meta+Left`, `Meta+Right`, `Meta+Up` and `Meta+Down` (quick tiling) and `Meta+PgUp` and `Meta+PgDown`
 (maximize and minimize). Clear those in Shortcuts, then set tide's.
 
 ## Settings
