@@ -61,4 +61,9 @@ export const KEYS = [
   { name: "tide-move-previous-workspace", title: "Move the window to the previous workspace", key: "Meta+Shift+PgUp", action: "moveToStep", arg: -1 },
   { name: "tide-move-next-workspace", title: "Move the window to the next workspace", key: "Meta+Shift+PgDown", action: "moveToStep", arg: 1 },
   ...workspaceKeys(),
+  // No key: the layout widget presses it as it loads, for the layouts now.
+  { name: "tide-announce", title: "Tell the layout widget the layouts", key: "", action: "reannounce" },
+  // No key: a click on the layout widget, which is on the monitor under
+  // the pointer, as the click is.
+  { name: "tide-next-layout-here", title: "Next layout on the monitor under the pointer", key: "", action: "cycleHere" },
 ];

@@ -44,3 +44,22 @@ jobs:
         env:
           KWIN: /opt/kwin/kwin_wayland
           LANG: C.UTF-8
+  # The layout widget in a real plasmashell on the headless KWin.
+  plasma:
+    runs-on: ubuntu-latest
+    container: ubuntu:devel
+    steps:
+      - run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates git kwin-wayland kwin-common kpackagetool6 plasma-desktop foot qdbus-qt6 dbus python3 nodejs make
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: install -D /usr/bin/kwin_wayland /opt/kwin/kwin_wayland
+      - run: make package/contents/code/main.js
+      - run: cd tests/kwin && dbus-run-session -- python3 -m unittest -v test_plasma
+        env:
+          KWIN: /opt/kwin/kwin_wayland
+          LANG: C.UTF-8
+          TIDE_PLASMA: "1"

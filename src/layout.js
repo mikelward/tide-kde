@@ -28,6 +28,14 @@ export const DEFAULTS = {
 
 export const SYMBOLS = { tile: "[]=", threecol: "|M|", twocol: "||=", monocle: "[M]" };
 
+// What tide's bar shows for `mode` with `tiled` tiled windows: monocle
+// shows how many windows it hides, `[n]`, and `[M]` while it hides none, as
+// tide's shell/lib/layouts.mjs's layoutSymbol does.
+export function symbol(mode, tiled) {
+  if (mode === "monocle" && tiled > 1) return `[${tiled - 1}]`;
+  return SYMBOLS[mode] ?? "";
+}
+
 export function copy(v) {
   return v === undefined ? v : JSON.parse(JSON.stringify(v));
 }

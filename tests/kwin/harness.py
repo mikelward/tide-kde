@@ -150,16 +150,18 @@ class KWinTest(unittest.TestCase):
         return result.stdout.strip()
 
     def wait_for_dbus(self):
-        # KWin takes its name after it accepts clients; the name's arrival
-        # is announced on the bus, which qdbus can't wait on, so this asks
-        # D-Bus whether it's there yet.
-        deadline = time.monotonic() + TIMEOUT
+        self.wait_for_name("org.kde.KWin")
+
+    def wait_for_name(self, name):
+        # A name's arrival is announced on the bus, which qdbus can't wait
+        # on, so this asks D-Bus whether it's there yet.
+        deadline = time.monotonic() + TIMEOUT * 3
         while True:
             names = subprocess.run([QDBUS], env=self.env, capture_output=True, text=True).stdout
-            if "org.kde.KWin" in names.split():
+            if name in names.split():
                 return
             if time.monotonic() > deadline:
-                raise AssertionError("KWin never took its D-Bus name")
+                raise AssertionError(f"nothing took the D-Bus name {name}")
             select.select([], [], [], 0.05)
 
     def load(self, path, name):

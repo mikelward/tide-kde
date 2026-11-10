@@ -154,9 +154,19 @@ Status: **yes**, **partial**, **no**, or **differs** (done another way).
   workspaces by name. tide's own bar could run on Plasma later, fed by
   the script over D-Bus as a third backend beside Hyprland's and
   tidewm's (tide `shell/Compositor.qml`), but that's much more work.
-- **The layout symbol** goes in a panel widget of its own, a plasmoid
-  showing `[]=`, `|M|`, `||=` or `[M]` for the focused monitor, as tide's
+- **The layout symbol** is in a panel widget of its own, `plasmoid/`,
+  showing the layout of the workspace on its panel's monitor, as tide's
   bar does. A click is the next layout.
+  - A script can call D-Bus but can't be called, so it can't serve the
+    widget. Instead it writes the widget's settings through plasmashell's
+    scripting (`org.kde.PlasmaShell.evaluateScript`, `writeConfig` then
+    `reloadConfig`), which the widget follows at once. It writes them only
+    when a layout changes.
+  - A widget just added, or a plasmashell just started, asks for them
+    by pressing a shortcut tide has with no key, `tide-announce`, through
+    KGlobalAccel's `invokeShortcut`, with Plasma's QML D-Bus module
+    (`org.kde.plasma.workspace.dbus`). A click presses `tide-next-layout`
+    the same way.
 - **Login** is tide's greeter (tide §11), which already lists every
   session greetd can start, Plasma's among them. An SDDM theme could
   match it, but needn't.
@@ -210,8 +220,9 @@ tide-kde supersedes tide's Plasma launcher, and takes over its unit's name.
    tide-kde needs tide installed), or carry a copy checked against tide's,
    as tidemo's `make check-tide` does?
 2. **How the script talks to others.** A script can call D-Bus but not
-   answer it, so the launcher's Workspaces and Windows tabs and the
-   layout widget need it to call them, or a helper that holds a name.
+   answer it. The layout widget gets its settings written (§4.7); the
+   launcher's Workspaces and Windows tabs need the same, or a helper that
+   holds a name.
 3. **The focus guard.** Is KWin's prevention at Medium close enough to
    tide §14.1, or does the script need its own rules on `windowAdded`?
 4. **`keep_open`.** Without it, `Ctrl+Q` closes a browser on Plasma. Say

@@ -1,0 +1,14 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Category": "Windows and Tasks",
+        "Description": "The layout of the window you're in, as tide's bar shows it",
+        "Icon": "view-grid",
+        "Id": "org.tide.layout",
+        "License": "Apache-2.0",
+        "Name": "tide Layout",
+        "Version": "0",
+        "Website": "https://github.com/mikelward/tide-kde"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}

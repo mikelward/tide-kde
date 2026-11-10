@@ -50,6 +50,8 @@ export class Tide {
     this.dim = true;
     // Whether Dim Inactive is loaded, as tide last asked; null before it has.
     this.dimLoaded = null;
+    // The layouts last written for the layout widget, as JSON.
+    this.announced = null;
   }
 
   log(text) {
@@ -106,8 +108,10 @@ export class Tide {
       this.env.registerShortcut(k.name, `tide: ${k.title}`, k.key, () => this.run(k));
     }
     this.ws.windowActivated?.connect(() => this.updateDim());
+    this.ws.currentDesktopChanged.connect(() => this.announce());
     this.relayoutAll();
     this.updateDim();
+    this.announce();
     this.log("started");
   }
 
@@ -286,6 +290,7 @@ export class Tide {
     const desktop = this.desktopOf(key);
     if (!output || !desktop) return;
     const windows = this.tiledIn(key);
+    this.announce();
     if (windows.length === 0) return;
     const area = this.area(output, desktop);
     const boxes = layout.arrange(this.parts.get(key), area, windows.map(idOf), this.config);
@@ -298,6 +303,54 @@ export class Tide {
 
   relayoutAll() {
     for (const key of new Set(this.placed.values())) this.relayout(key);
+  }
+
+  // --- The layout widget (SPEC.md §4.7) -----------------------------------
+
+  // Each monitor's layout on the current desktop, {output: {symbol, mode}}.
+  layouts() {
+    const desktop = this.ws.currentDesktop;
+    const out = {};
+    for (const o of this.ws.screens) {
+      const key = `${desktop.id}|${o.name}`;
+      const p = this.part(key, o);
+      out[o.name] = { symbol: layout.symbol(p.mode, this.tiledIn(key).length), mode: p.mode };
+    }
+    return out;
+  }
+
+  // Tells the layout widget (plasmoid/) each monitor's layout when it
+  // changes. A KWin script can't be asked, so it writes the widget's
+  // settings through plasmashell's scripting, which the widget follows.
+  announce() {
+    const json = JSON.stringify(this.layouts());
+    if (json === this.announced) return;
+    this.announced = json;
+    const script =
+      `for (const c of [...panels(), ...desktops()]) for (const w of c.widgets("org.tide.layout")) {` +
+      ` w.currentConfigGroup = ["General"]; w.writeConfig("layouts", ${JSON.stringify(json)}); w.reloadConfig(); }`;
+    try {
+      this.env.callDBus("org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell", "evaluateScript", script);
+    } catch (e) {
+      this.log(`couldn't tell the layout widget (${e}), so it may show an old layout`);
+      this.announced = null;
+    }
+  }
+
+  // The next layout on the monitor under the pointer: a click on that
+  // monitor's layout widget, whichever window has focus.
+  cycleHere() {
+    const output = this.ws.screenAt(this.ws.cursorPos);
+    if (!output) return;
+    const key = `${this.ws.currentDesktop.id}|${output.name}`;
+    layout.cycle(this.part(key, output), 1, this.config);
+    this.relayout(key);
+  }
+
+  // Tells the widget again, as one that's just loaded asks.
+  reannounce() {
+    this.announced = null;
+    this.announce();
   }
 
   // --- The dim (SPEC.md §4.2) ---------------------------------------------

@@ -22,6 +22,10 @@ launcher on Plasma and take over its `tide-kde.service` (SPEC.md §5).
 - **The dim.** Plasma's Dim Inactive effect dims every window but the
   active one, and tide has it on only while a monitor shows two windows or
   more. Its strength is Plasma's setting, under Desktop Effects.
+- **The layout widget**, "tide Layout" in Add Widgets, shows the layout
+  of the workspace on its panel's monitor as tide's bar does: `[]=`,
+  `|M|`, `||=`, or `[n]` in monocle with n windows hidden. A click is the
+  next layout.
 - **Workspaces** are Plasma's virtual desktops, which span every monitor.
   The first is home, `in` by default, named so at start. The other standing
   ones, `re`, `oc` and `me`, are made the first time you go there or send a
@@ -34,10 +38,12 @@ From a checkout, with Node for the build:
 
     make install
 
-That builds the script, installs it with `kpackagetool6`, turns it on in
-`kwinrc` and has KWin load it. `make uninstall` takes it out again.
-`make dist` makes `dist/tide.kwinscript` for System Settings → Window
-Management → KWin Scripts → Install from File.
+That builds the script, installs it and the layout widget with
+`kpackagetool6`, turns the script on in `kwinrc` and has KWin load it.
+`make uninstall` takes them out again. `make dist` makes
+`dist/tide.kwinscript`, for System Settings → Window Management → KWin
+Scripts → Install from File, and `dist/tide-layout.plasmoid`, for Add
+Widgets → Get New → Install Widget From Local File.
 
 ## Keys
 
@@ -98,6 +104,8 @@ default.
     make test-kwin        # the script in a headless KWin
     make check-tideco     # the geometry is tide for Chrome's, unchanged
 
+`make test-kwin` also runs the layout widget in a real plasmashell when
+there's one (Ubuntu's `plasma-desktop`), as CI's `plasma` job does.
 `make test-kwin` needs `kwin_wayland`, KWin's package structures (Debian's and Ubuntu's `kwin-common`), `kpackagetool6`, `foot`, `qdbus6`
 and `dbus-run-session`; CI runs it on Ubuntu's devel release. KWin's
 script engine has no object spread, no `\p{...}` in regular expressions
