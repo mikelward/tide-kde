@@ -26,6 +26,7 @@ export const KEYS = {
   twocolNmaster: String(layout.DEFAULTS.modes.twocol.nmaster),
   single: layout.DEFAULTS.single.map((r) => `${r.minAspect}:${r.width}`).join(", "),
   newWindow: layout.DEFAULTS.newWindow,
+  dim: "true",
 };
 
 function number(key, text, lo, hi, whole) {
@@ -35,6 +36,12 @@ function number(key, text, lo, hi, whole) {
     return { error: `${key} must be ${whole ? "a whole number" : "a number"} from ${lo} to ${hi}, not ${JSON.stringify(s)}` };
   }
   return { value: v };
+}
+
+function bool(key, text) {
+  const s = String(text).trim().toLowerCase();
+  if (s === "true" || s === "false") return { value: s === "true" };
+  return { error: `${key} must be true or false, not ${JSON.stringify(String(text))}` };
 }
 
 function oneOf(key, text, list) {
@@ -58,12 +65,14 @@ function singleRules(key, text) {
   return { value: rules };
 }
 
-// {config, standing, errors}: the layout config for layout.js, the standing
-// names, and an error for each setting that couldn't be used.
+// {config, standing, dim, errors}: the layout config for layout.js, the
+// standing names, whether tide turns Dim Inactive on and off, and an error
+// for each setting that couldn't be used.
 export function load(read) {
   const config = layout.copy(layout.DEFAULTS);
   const errors = [];
   let standing = [...workspaces.DEFAULT_STANDING];
+  let dim = true;
   const get = (key) => {
     const v = read(key);
     return v === undefined || v === null ? KEYS[key] : v;
@@ -85,5 +94,6 @@ export function load(read) {
   }
   take(singleRules("single", get("single")), (v) => (config.single = v));
   take(oneOf("newWindow", get("newWindow"), NEW_WINDOW), (v) => (config.newWindow = v));
-  return { config, standing, errors };
+  take(bool("dim", get("dim")), (v) => (dim = v));
+  return { config, standing, dim, errors };
 }

@@ -7,14 +7,15 @@ import * as layout from "./layout.js";
 const load = (values) => settings.load((k) => values[k]);
 
 test("with nothing set, tide's defaults", () => {
-  const { config, standing, errors } = load({});
+  const { config, standing, dim, errors } = load({});
   assert.deepEqual(errors, []);
+  assert.equal(dim, true);
   assert.deepEqual(standing, ["in", "re", "oc", "me"]);
   assert.deepEqual(config, layout.DEFAULTS);
 });
 
 test("each setting reaches the config", () => {
-  const { config, standing, errors } = load({
+  const { config, standing, dim, errors } = load({
     standing: "home, web",
     ultrawideAspect: "2.3",
     normalMode: "twocol",
@@ -24,6 +25,7 @@ test("each setting reaches the config", () => {
     threecolNmaster: "2",
     single: "2.1:0.7, 3:0.5",
     newWindow: "top",
+    dim: "False",
   });
   assert.deepEqual(errors, []);
   assert.deepEqual(standing, ["home", "web"]);
@@ -33,6 +35,7 @@ test("each setting reaches the config", () => {
   assert.equal(config.modes.threecol.nmaster, 2);
   assert.deepEqual(config.single, [{ minAspect: 2.1, width: 0.7 }, { minAspect: 3, width: 0.5 }]);
   assert.equal(config.newWindow, "top");
+  assert.equal(dim, false);
 });
 
 test("an empty single-window rule fills the width", () => {
@@ -48,6 +51,7 @@ test("each bad setting is named, and keeps its default", () => {
     single: "wide",
     newWindow: "",
     ultrawideAspect: "x",
+    dim: "yes",
   });
   assert.deepEqual(errors, [
     'ultrawideAspect must be a number from 0.1 to 100, not "x"',
@@ -57,6 +61,7 @@ test("each bad setting is named, and keeps its default", () => {
     'twocolNmaster must be a whole number from 1 to 100, not "1.5"',
     'single must be aspect:width pairs split by commas, as 2.1:0.8, not "wide"',
     'newWindow must be one of end, top, next, master, not ""',
+    'dim must be true or false, not "yes"',
   ]);
   assert.deepEqual(config, layout.DEFAULTS);
 });

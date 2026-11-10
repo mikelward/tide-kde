@@ -189,7 +189,9 @@ export function fakeEnv(ws, config = {}) {
       return Object.hasOwn(config, key) ? config[key] : fallback;
     },
     callDBus(...args) {
+      const reply = typeof args.at(-1) === "function" ? args.pop() : null;
       env.calls.push(args);
+      if (reply) reply(true);
     },
     print(text) {
       env.logs.push(text);

@@ -26,12 +26,14 @@ TIMEOUT = float(os.environ.get("TIDE_TIMEOUT", "10"))
 
 
 class Log:
-    """KWin's log, read line by line as it grows."""
+    """KWin's log, read line by line as it grows. Each wait reads on from
+    the last line a wait matched, or from a mark taken earlier."""
 
     def __init__(self, path):
         self.file = open(path, "rb")
         self.partial = b""
         self.lines = []
+        self.pos = 0
 
     def close(self):
         self.file.close()
@@ -41,18 +43,26 @@ class Log:
         if data:
             *done, self.partial = (self.partial + data).split(b"\n")
             self.lines += [line.decode("utf-8", "replace") for line in done]
+        return bool(data)
 
-    def wait(self, test, what):
-        """The first line from here on for which test(line) holds; the lines
-        before it are passed over."""
+    def mark(self):
+        """Where the log is now, for a wait to read on from."""
+        self.read()
+        return len(self.lines)
+
+    def wait(self, test, what, since=None):
+        """The first line from `since` (by default, after the last match) for
+        which test(line) holds."""
+        i = self.pos if since is None else since
         deadline = time.monotonic() + TIMEOUT
         while True:
-            while self.lines:
-                line = self.lines.pop(0)
+            while i < len(self.lines):
+                line = self.lines[i]
+                i += 1
                 if test(line):
+                    self.pos = max(self.pos, i)
                     return line
-            self.read()
-            if self.lines:
+            if self.read():
                 continue
             if time.monotonic() > deadline:
                 raise AssertionError(f"KWin's log never said {what}")

@@ -306,3 +306,41 @@ test("right from an empty monitor's edge focuses the next monitor", () => {
   env.press("tide-focus-right");
   assert.equal(ws.activeScreen.name, "B");
 });
+
+function effects(env) {
+  return env.calls.filter((c) => c[2] === "org.kde.kwin.Effects").map((c) => c[3]);
+}
+
+test("the dim is on only while a monitor shows two windows", () => {
+  const { ws, env } = start();
+  assert.deepEqual(effects(env), ["unloadEffect"]);
+  ws.open();
+  const b = ws.open();
+  assert.deepEqual(effects(env), ["unloadEffect", "loadEffect"]);
+  b.minimized = true;
+  assert.deepEqual(effects(env), ["unloadEffect", "loadEffect", "unloadEffect"]);
+});
+
+test("one window on each of two monitors isn't dimmed", () => {
+  const { ws, env } = start(pairOfMonitors());
+  ws.open();
+  ws.activeScreen = ws.screens[1];
+  ws.open();
+  assert.deepEqual(effects(env), ["unloadEffect"]);
+});
+
+test("a window on every desktop counts toward the dim", () => {
+  const { ws, env } = start();
+  ws.open();
+  const sticky = ws.open({ _desktops: [] });
+  assert.deepEqual(effects(env), ["unloadEffect", "loadEffect"]);
+  sticky.closeWindow();
+  assert.deepEqual(effects(env), ["unloadEffect", "loadEffect", "unloadEffect"]);
+});
+
+test("with dim false, tide leaves Dim Inactive alone", () => {
+  const { ws, env } = start({}, { dim: "false" });
+  ws.open();
+  ws.open();
+  assert.deepEqual(effects(env), []);
+});

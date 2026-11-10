@@ -19,6 +19,9 @@ launcher on Plasma and take over its `tide-kde.service` (SPEC.md §5).
   edge to set its width.
 - **Floating.** Dialogs, windows of a fixed size and windows on every
   desktop float, as do those you float with the key.
+- **The dim.** Plasma's Dim Inactive effect dims every window but the
+  active one, and tide has it on only while a monitor shows two windows or
+  more. Its strength is Plasma's setting, under Desktop Effects.
 - **Workspaces** are Plasma's virtual desktops, which span every monitor.
   The first is home, `in` by default, named so at start. The other standing
   ones, `re`, `oc` and `me`, are made the first time you go there or send a
@@ -86,6 +89,7 @@ default.
 | `tileMfact`, `threecolMfact`, `twocolMfact` | `0.55`, `0.5`, `0.72` | the master's share |
 | `tileNmaster`, `threecolNmaster`, `twocolNmaster` | `1`, `1`, `2` | how many masters |
 | `single` | `2.1:0.8, 3.2:0.6` | a lone window's width from each aspect up; empty to fill |
+| `dim` | `true` | turn Dim Inactive on only while a monitor shows two windows or more; `false` leaves it as Plasma's settings have it |
 | `newWindow` | `end` | where a new window goes: `end`, `top` of the stack, `next` to the focused one, or `master` |
 
 ## Development
