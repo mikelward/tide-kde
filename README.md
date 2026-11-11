@@ -108,7 +108,10 @@ After `make install`, this sets Plasma up as tide has it:
 - puts the layout widget on the first panel;
 - gives the lock screen the desktop's wallpaper, as it is then.
 
-`node scripts/setup.mjs --dry-run` says what it would change.
+`node scripts/setup.mjs --dry-run` says what it would change. Plasma reads
+its shortcuts as the session starts; `--batch FILE` also adds them to FILE
+for scripts' `kdeshortcut.py` (mikelward/scripts), which applies them to
+the running session, as its `setup-kde` does.
 
 ## Settings
 

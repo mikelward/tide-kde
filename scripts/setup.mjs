@@ -3,12 +3,19 @@
 // prevention, turns the script on, puts the layout widget on the first
 // panel, and gives the lock screen the desktop's wallpaper. `make setup` runs it; scripts' setup-kde can.
 //
-//   node scripts/setup.mjs [--dry-run]
+//   node scripts/setup.mjs [--dry-run] [--batch FILE]
+//
+// --batch FILE adds each shortcut it sets, written now or before, to FILE,
+// a line apiece in the batch form of scripts' kdeshortcut.py (component,
+// action, keys split by spaces or "none", label; tab-separated), which
+// pushes them into the running session, as scripts' setup-kde does with its
+// own.
 //
 // Only kreadconfig6, kwriteconfig6 and qdbus6 are run, so `plan` tests
 // with no Plasma. Plasma reads its shortcuts as the session starts, so
 // they take effect at the next login.
 import { execFileSync } from "node:child_process";
+import { appendFileSync } from "node:fs";
 import { KEYS } from "../src/keys.js";
 
 // The Plasma shortcuts that hold tide's keys, as Plasma 6.7 binds them:
@@ -131,12 +138,45 @@ export function plan(read) {
   return writes;
 }
 
+// The Plasma shortcuts tide's keys take, and tide's own, as the config has
+// them: what the running session should hold once `plan`'s writes are made.
+// The live apply gets them all, not only those written, as KGlobalAccel
+// keeps the old ones until the next login.
+export function shortcutEntries(read) {
+  const out = [];
+  const add = (group, key) => {
+    const value = read("kglobalshortcutsrc", group, key);
+    if (value !== null) out.push({ file: "kglobalshortcutsrc", group, key, value });
+  };
+  for (const [group, entry] of TAKEN) add(group, entry);
+  for (const k of KEYS) if (k.key) add("kwin", k.name);
+  return out;
+}
+
+// The shortcut entries among `writes`, as kdeshortcut.py batch lines.
+export function batchLines(writes) {
+  return writes
+    .filter((w) => w.file === "kglobalshortcutsrc")
+    .map((w) => {
+      const e = parseEntry(w.value);
+      const keys = e.active.length === 0 ? "none" : e.active.join(" ");
+      return `${w.group}\t${w.key}\t${keys}\t${e.name}\n`;
+    })
+    .join("");
+}
+
 function run(cmd, args) {
   return execFileSync(cmd, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 }
 
 function main() {
   const dry = process.argv.includes("--dry-run");
+  const at = process.argv.indexOf("--batch");
+  const batch = at >= 0 ? process.argv[at + 1] : null;
+  if (at >= 0 && !batch) {
+    console.error("--batch needs a file");
+    process.exit(2);
+  }
   const read = (file, group, key) => {
     const v = run("kreadconfig6", ["--file", file, "--group", group, "--key", key]).replace(/\n$/, "");
     return v === "" ? null : v;
@@ -154,6 +194,7 @@ function main() {
     if (!dry) run("kwriteconfig6", ["--file", w.file, ...w.groups.flatMap((g) => ["--group", g]), "--key", w.key, w.value]);
   }
   if (dry) return;
+  if (batch) appendFileSync(batch, batchLines(shortcutEntries(read)));
   try {
     run("qdbus6", ["org.kde.KWin", "/KWin", "reconfigure"]);
   } catch (e) {
@@ -164,7 +205,7 @@ function main() {
   } catch (e) {
     console.error(`couldn't put the layout widget on a panel (${e.stderr || e.message}); add "tide Layout" from Add Widgets`);
   }
-  console.log("tide's keys take over from Plasma's at the next login.");
+  if (!batch) console.log("tide's keys take over from Plasma's at the next login.");
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) main();
