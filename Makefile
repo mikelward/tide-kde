@@ -29,6 +29,7 @@ TESTS = \
 	src/tide_test.js \
 	src/workspaces_test.js \
 	scripts/bundle_test.mjs \
+	scripts/install_test.mjs \
 	scripts/setup_test.mjs
 
 .PHONY: all lint test test-kwin check-tideco dist install uninstall setup version unshallow-check clean
@@ -76,18 +77,24 @@ dist: $(SCRIPT) unshallow-check
 	cd dist/tide && zip -qr ../tide.kwinscript .
 	cd dist/tide-layout && zip -qr ../tide-layout.plasmoid .
 
+# Has a running KWin reload its scripts. Where KWin isn't running (setup run
+# from a console or another desktop), there's nothing to reload: Plasma's
+# next login loads what's installed.
+RELOAD_KWIN = if qdbus6 org.kde.KWin >/dev/null 2>&1; then qdbus6 org.kde.KWin /KWin reconfigure; \
+	else echo "KWin isn't running, so tide loads at the next Plasma login"; fi
+
 install: $(SCRIPT)
 	kpackagetool6 --type KWin/Script --upgrade package 2>/dev/null || kpackagetool6 --type KWin/Script --install package
 	kpackagetool6 --type Plasma/Applet --upgrade plasmoid 2>/dev/null || kpackagetool6 --type Plasma/Applet --install plasmoid
 	kwriteconfig6 --file kwinrc --group Plugins --key tideEnabled true
-	qdbus6 org.kde.KWin /KWin reconfigure
+	@$(RELOAD_KWIN)
 
 setup:
 	node scripts/setup.mjs
 
 uninstall:
 	kwriteconfig6 --file kwinrc --group Plugins --key tideEnabled false
-	qdbus6 org.kde.KWin /KWin reconfigure
+	@$(RELOAD_KWIN)
 	kpackagetool6 --type KWin/Script --remove tide
 	kpackagetool6 --type Plasma/Applet --remove org.tide.layout
 
