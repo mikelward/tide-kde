@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { KEYS } from "../src/keys.js";
-import { formatEntry, lockWallpaper, parseEntry, plan } from "./setup.mjs";
+import { batchLines, formatEntry, lockWallpaper, parseEntry, plan, shortcutEntries } from "./setup.mjs";
 
 // Plasma 6.7's own bindings, as its kglobalshortcutsrc has them.
 const PLASMA = {
@@ -79,4 +79,31 @@ test("the lock screen gets the desktop's image, and nothing without one", () => 
     { file: "kscreenlockerrc", groups: ["Greeter", "Wallpaper", "org.kde.image", "General"], key: "Image", value: "file:///pictures/sea.jpg" },
   ]);
   assert.deepEqual(lockWallpaper(""), []);
+});
+
+test("the shortcuts it writes go to kdeshortcut.py as batch lines, the rest don't", () => {
+  const lines = batchLines([
+    { file: "kglobalshortcutsrc", group: "kwin", key: "Walk Through Windows", value: "none,Alt+Tab\tMeta+Tab,Walk Through Windows" },
+    { file: "kglobalshortcutsrc", group: "kwin", key: "tide-previous-layout", value: "Meta+\\,,Meta+\\,,tide: Previous layout" },
+    { file: "kglobalshortcutsrc", group: "kwin", key: "Walk Through Windows of Current Application", value: "Alt+`,Alt+`\tMeta+`,Walk Through Windows of Current Application" },
+    { file: "kwinrc", group: "Windows", key: "FocusStealingPreventionLevel", value: "2" },
+  ]);
+  assert.equal(lines, [
+    "kwin\tWalk Through Windows\tnone\tWalk Through Windows\n",
+    "kwin\ttide-previous-layout\tMeta+,\ttide: Previous layout\n",
+    "kwin\tWalk Through Windows of Current Application\tAlt+`\tWalk Through Windows of Current Application\n",
+  ].join(""));
+});
+
+test("the batch has the shortcuts set by an earlier run too", () => {
+  const config = {};
+  for (const w of plan((file, group, key) => PLASMA[`${file} ${group} ${key}`] ?? null)) {
+    config[`${w.file} ${w.group} ${w.key}`] = w.value;
+  }
+  const read = (file, group, key) => config[`${file} ${group} ${key}`] ?? PLASMA[`${file} ${group} ${key}`] ?? null;
+  const lines = batchLines(shortcutEntries(read));
+  assert.equal(plan(read).filter((w) => w.file === "kglobalshortcutsrc").length, 0);
+  assert.match(lines, /^kwin\tWalk Through Windows\tnone\tWalk Through Windows$/m);
+  assert.match(lines, /^kwin\ttide-zoom\tAlt\+Tab\ttide: /m);
+  assert.match(lines, /^kwin\ttide-go-1\tMeta\+F1\ttide: Go to workspace 1$/m);
 });
