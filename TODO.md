@@ -29,15 +29,12 @@
     desktop's wallpaper. To do: propose kscreenlocker a setting naming the
     package its lock screen comes from, apart from the shell's; then ship
     tide's face, the hostname over the date and time, in one.
-12. The launcher's Workspaces and Windows tabs, served by the script
-    (SPEC.md §4.6).
-13. Take over `tide-kde.service` (SPEC.md §5), with tide in step: tide
-    stops installing it, and its `tide-doctor` check moves here.
+12. **In tide:** the launcher's Workspaces and Windows tabs, from KWin's
+    D-Bus (mikelward/tide#445, SPEC.md §4.6).
+13. **Decided:** `tide-kde.service` stays tide's (SPEC.md §5).
 
 ## Decisions needing review
 
-- The name `tide-kde.service` moves from tide's launcher to tide-kde,
-  which supersedes it (SPEC.md §5).
 - The script's ID is `tide`, so its settings are kwinrc's `[Script-tide]`
   and it's `tideEnabled` under `[Plugins]`.
 - Standing workspaces stay once made, even empty, so Plasma's Pager, the

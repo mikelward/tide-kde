@@ -19,9 +19,8 @@ are marked *(unverified)*. References like "tide §6.1" are to tide's
 - **tide's window management on Plasma:** its layouts, the single-window
   rule, the dim, named workspaces that span every monitor, the focus guard
   and its keys (tide §6, §14).
-- **tide's launcher with every tab.** tide's Plasma launcher (tide §8.5)
-  has only Apps and Actions, since only a compositor knows the workspaces
-  and windows. tide-kde's KWin script does, so it can serve them.
+- **tide's launcher with its tabs.** tide's Plasma launcher (tide §8.5)
+  stays tide's, and reads KWin's desktops and windows itself (§4.6).
 - **Plasma stays Plasma.** Its panel, notifications, lock, login and
   settings stay its own. tide-kde adds to them; it replaces none, except
   where tide §5.5 already does (the launcher on `Meta+Space`).
@@ -144,9 +143,9 @@ Status: **yes**, **partial**, **no**, or **differs** (done another way).
 
 | Feature | Status | How |
 |---|---|---|
-| Apps and Actions | yes | tide's Plasma launcher, as today |
-| Workspaces and Windows | yes | The script answers the launcher over D-Bus: `callDBus` out, a D-Bus service of the script's own in *(unverified: a script owning a name)*, or a QML script's |
-| Attention | partial | Urgent windows from the script; Plasma's notifications stay its own |
+| Apps and Actions | yes | tide's Plasma launcher, as before |
+| Workspaces and Windows | yes | tide's launcher reads KWin's own D-Bus as it opens: its desktops, its window search's windows, and each window's app and desktop (tide §8.5, mikelward/tide#445). It needs only stock KWin, not this script |
+| Attention | no | tide's focus guard marks windows for it, and Plasma doesn't run it |
 
 ### 4.7 Bar, login and lock
 
@@ -193,20 +192,18 @@ Status: **yes**, **partial**, **no**, or **differs** (done another way).
 
 ## 5. `tide-kde.service`
 
-tide-kde supersedes tide's Plasma launcher, and takes over its unit's name.
+`tide-kde.service` stays tide's, running tide's Plasma launcher
+(`shell/kde.qml`, tide §8.5), with its Workspaces and Windows tabs. tide's
+`setup` enables it, `tide-doctor` checks it, and scripts' `setup-kde`
+binds `Meta+Space` to it.
 
-- **Today,** tide's `tide-kde.service` runs `shell/kde.qml`, the launcher
-  alone (tide §8.5). `setup` enables it, `tide-doctor` checks it, and
-  scripts' `setup-kde` binds `Meta+Space` to it.
-- **After,** tide-kde ships `tide-kde.service`: the launcher with every
-  tab (§4.6), `PartOf=plasma-workspace.target` as now. The KWin script is
-  enabled in `kwinrc`, not by the unit.
-- **The handover.** The unit keeps its name, so a user who enabled it
-  keeps it enabled. tide's `make install` stops installing it, and
-  `tide-doctor`'s Plasma check moves here, in the same release as
-  tide-kde's first install. Until then, tide's stays.
-- **The launcher's code** is tide's: tide-kde runs tide's installed
-  Quickshell config rather than copying it. Open question 1.
+- **Why not here.** The launcher is about 79 QML files and 57 modules of
+  tide's shell. tide-kde would have to copy them, as tidemo copies tide's
+  code, or run tide's installed files from a unit of its own; either way
+  the two repositories would release in step for nothing.
+- **What's here** is what runs inside KWin and Plasma: the script, the
+  layout widget, setup and releases. Neither half needs the other: tide's
+  launcher reads stock KWin, and tide-kde tiles with or without it.
 
 ## 6. Testing
 
@@ -228,16 +225,9 @@ tide-kde supersedes tide's Plasma launcher, and takes over its unit's name.
 
 ## 7. Open questions
 
-1. **The launcher's home.** Run tide's installed config (no copy, but
-   tide-kde needs tide installed), or carry a copy checked against tide's,
-   as tidemo's `make check-tide` does?
-2. **How the script talks to others.** A script can call D-Bus but not
-   answer it. The layout widget gets its settings written (§4.7); the
-   launcher's Workspaces and Windows tabs need the same, or a helper that
-   holds a name.
-3. **The focus guard.** Is KWin's prevention at Medium close enough to
+1. **The focus guard.** Is KWin's prevention at Medium close enough to
    tide §14.1, or does the script need its own rules on `windowAdded`?
-4. **`keep_open`.** Without it, `Ctrl+Q` closes a browser on Plasma. Say
+2. **`keep_open`.** Without it, `Ctrl+Q` closes a browser on Plasma. Say
    so, or ask KWin upstream for a veto?
 
 ## Sources

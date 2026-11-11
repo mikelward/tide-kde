@@ -5,8 +5,9 @@ layouts, workspaces and keys as a KWin 6 script. Plasma's panel,
 notifications, lock and settings stay its own.
 
 [SPEC.md](SPEC.md) says what KWin allows and how each of tide's features
-maps onto it; [TODO.md](TODO.md) is the plan. tide-kde will supersede tide's
-launcher on Plasma and take over its `tide-kde.service` (SPEC.md §5).
+maps onto it; [TODO.md](TODO.md) is the plan. `Meta+Space` stays tide's
+launcher on Plasma, with its Workspaces and Windows tabs, from tide
+(SPEC.md §4.6, §5).
 
 ## What it does
 

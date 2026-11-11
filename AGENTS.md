@@ -1,15 +1,15 @@
 ---
 trigger: always_on
 alwaysApply: true
-last_modified: 2026-11-10
+last_modified: 2026-11-11
 ---
 
 # tide-kde
 
 tide on KDE Plasma: tide for Linux's tiling, workspaces, dim and keys as a KWin 6
-script, with tide's launcher beside it. It supersedes tide's Plasma launcher and its
-`tide-kde.service`. `SPEC.md` says what KWin allows and at what cost; `TODO.md` what's
-next.
+script, with a layout widget for Plasma's panel. tide's launcher and its
+`tide-kde.service` stay tide's. `SPEC.md` says what KWin allows and at what cost;
+`TODO.md` what's next.
 
 ## Fleet conventions
 
