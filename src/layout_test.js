@@ -108,6 +108,17 @@ test("monocle toggles back to the mode before it", () => {
   assert.equal(p.mode, "threecol");
 });
 
+test("a part that starts in monocle toggles out of it, to the cycle's first", () => {
+  const config = layout.copy(layout.DEFAULTS);
+  config.defaultMode.normal = "monocle";
+  const p = part(["a", "b"], HD, config);
+  assert.equal(p.mode, "monocle");
+  layout.toggleMonocle(p, config);
+  assert.equal(p.mode, "tile");
+  layout.toggleMonocle(p, config);
+  assert.equal(p.mode, "monocle");
+});
+
 test("the layout used last flips between two", () => {
   const p = part(["a"]);
   layout.last(p);
