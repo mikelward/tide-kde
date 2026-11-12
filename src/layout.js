@@ -48,14 +48,20 @@ export function create(area, config = DEFAULTS) {
 }
 
 // Puts `id` into the order where config.newWindow says. `focused` is the
-// window that had focus, for "next".
-export function insert(part, id, focused, config = DEFAULTS) {
+// window that had focus, for "next". `tiled` is the order filtered to the
+// windows that are tiled now, for "top": the order also holds the part's
+// minimized, floating and fullscreen windows, which are no masters, so the
+// top of the stack is after the last master of those tiled.
+export function insert(part, id, focused, config = DEFAULTS, tiled = part.order) {
   if (part.order.includes(id)) return;
   const nmaster = part.opts[part.mode]?.nmaster ?? 1;
   let at = part.order.length;
   if (config.newWindow === "master") at = 0;
-  else if (config.newWindow === "top") at = Math.min(nmaster, part.order.length);
-  else if (config.newWindow === "next") {
+  else if (config.newWindow === "top") {
+    const masters = Math.min(nmaster, tiled.length);
+    if (masters > 0) at = part.order.indexOf(tiled[masters - 1]) + 1;
+    else if (tiled.length > 0) at = part.order.indexOf(tiled[0]);
+  } else if (config.newWindow === "next") {
     const i = part.order.indexOf(focused);
     if (i >= 0) at = i + 1;
   }
