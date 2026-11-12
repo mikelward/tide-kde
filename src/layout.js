@@ -158,9 +158,12 @@ export function cycle(part, delta, config = DEFAULTS) {
   setMode(part, list[(((i + delta) % list.length) + list.length) % list.length]);
 }
 
+// Out of monocle it goes back to the mode before it. A part that started
+// in monocle has none, so it takes the cycle's first, as tide's does: the
+// default mode would be monocle again, and the key would do nothing.
 export function toggleMonocle(part, config = DEFAULTS) {
   if (part.mode === "monocle") {
-    const back = part.prevMode ?? config.defaultMode.normal;
+    const back = part.prevMode ?? config.cycle[0];
     part.prevMode = undefined;
     setMode(part, back);
   } else {

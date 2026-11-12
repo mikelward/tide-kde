@@ -138,6 +138,17 @@ test("the layout used last comes back with two presses", () => {
   assert.deepEqual(box(a), [0, 0, 960, 1080]);
 });
 
+test("with normalMode monocle, the monocle key still leaves monocle", () => {
+  const { ws, env } = start({}, { normalMode: "monocle" });
+  const a = ws.open();
+  const b = ws.open();
+  assert.deepEqual([box(a), box(b)], [[0, 0, 1920, 1080], [0, 0, 1920, 1080]]);
+  env.press("tide-monocle");
+  assert.deepEqual([box(a), box(b)], [[0, 0, 1056, 1080], [1056, 0, 864, 1080]]);
+  env.press("tide-monocle");
+  assert.deepEqual([box(a), box(b)], [[0, 0, 1920, 1080], [0, 0, 1920, 1080]]);
+});
+
 test("the keys act on the active monitor's part with no window", () => {
   const { ws, env, tide } = start();
   env.press("tide-next-layout");
