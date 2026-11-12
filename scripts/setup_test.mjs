@@ -1,6 +1,11 @@
 // Tests for setup.mjs's plan: what it writes over Plasma's own settings.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { chmodSync, cpSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { KEYS } from "../src/keys.js";
 import { batchLines, formatEntry, lockWallpaper, parseEntry, plan, shortcutEntries } from "./setup.mjs";
 
@@ -106,4 +111,45 @@ test("the batch has the shortcuts set by an earlier run too", () => {
   assert.match(lines, /^kwin\tWalk Through Windows\tnone\tWalk Through Windows$/m);
   assert.match(lines, /^kwin\ttide-zoom\tAlt\+Tab\ttide: /m);
   assert.match(lines, /^kwin\ttide-go-1\tMeta\+F1\ttide: Go to workspace 1$/m);
+});
+
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
+
+// What `node <script> --dry-run` prints, with stubs for KDE's tools: a
+// kreadconfig6 that finds nothing set, and a qdbus6 with no Plasma to ask.
+function dryRun(script) {
+  const bin = mkdtempSync(join(tmpdir(), "tide-kde-setup-bin-"));
+  try {
+    for (const [tool, status] of [["kreadconfig6", 0], ["qdbus6", 1]]) {
+      writeFileSync(join(bin, tool), `#!/bin/sh\nexit ${status}\n`);
+      chmodSync(join(bin, tool), 0o755);
+    }
+    return execFileSync(process.execPath, [script, "--dry-run"], {
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } finally {
+    rmSync(bin, { recursive: true, force: true });
+  }
+}
+
+test("setup runs from a checkout whose path has a space", () => {
+  const dir = mkdtempSync(join(tmpdir(), "tide kde setup-"));
+  try {
+    for (const part of ["scripts", "src"]) cpSync(join(ROOT, part), join(dir, part), { recursive: true });
+    assert.match(dryRun(join(dir, "scripts", "setup.mjs")), /^kwinrc \[Plugins\] tideEnabled=true$/m);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("setup runs from a checkout reached through a link", () => {
+  const dir = mkdtempSync(join(tmpdir(), "tide-kde-setup-"));
+  try {
+    symlinkSync(ROOT, join(dir, "link"));
+    assert.match(dryRun(join(dir, "link", "scripts", "setup.mjs")), /^kwinrc \[Plugins\] tideEnabled=true$/m);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

@@ -6,8 +6,10 @@ import { execFileSync } from "node:child_process";
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const ROOT = new URL("..", import.meta.url).pathname;
+// As a path, not a URL's: that has a space as %20, which make can't find.
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
 
 // Stubs for KDE's tools that log their arguments. qdbus6 answers as KWin
 // would, running or not.
