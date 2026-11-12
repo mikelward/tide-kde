@@ -30,6 +30,22 @@ test("new windows go where newWindow says", () => {
   assert.equal(at("master"), "nabc");
 });
 
+test("the top of the stack is counted in the windows tiled now", () => {
+  const config = Object.assign(layout.copy(layout.DEFAULTS), { newWindow: "top" });
+  const at = (order, tiled) => {
+    const p = part(order);
+    layout.insert(p, "n", null, config, tiled);
+    return p.order.join("");
+  };
+  // a is minimized, so b is the master and n goes after it
+  assert.equal(at(["a", "b", "c"], ["b", "c"]), "abnc");
+  // x floats between the master and the stack
+  assert.equal(at(["a", "x", "b"], ["a", "b"]), "anxb");
+  // Fewer tiled than masters: after the last of them
+  assert.equal(at(["a", "x"], ["a"]), "anx");
+  assert.equal(at(["x", "y"], []), "xyn");
+});
+
 test("a window is in the order once", () => {
   const p = part(["a", "a"]);
   assert.deepEqual(p.order, ["a"]);

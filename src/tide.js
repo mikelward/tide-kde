@@ -228,7 +228,8 @@ export class Tide {
       this.placed.delete(id);
     }
     if (key !== null && was !== key) {
-      layout.insert(this.part(key, w.output), id, focused ? idOf(focused) : null, this.config);
+      const part = this.part(key, w.output);
+      layout.insert(part, id, focused ? idOf(focused) : null, this.config, this.tiledIn(key).map(idOf));
       this.placed.set(id, key);
       const landing = this.landings.get(id);
       this.landings.delete(id);

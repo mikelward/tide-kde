@@ -200,6 +200,20 @@ test("settings set the layouts", () => {
   assert.deepEqual([box(b), box(a)], [[0, 0, 1152, 1080], [1152, 0, 768, 1080]]);
 });
 
+test("newWindow top puts a window after the master, with one minimized before it", () => {
+  const { ws } = start({}, { newWindow: "top" });
+  const a = ws.open();
+  const b = ws.open();
+  const c = ws.open();
+  // c went to the top of the stack, after the master a
+  assert.deepEqual([box(a), box(c), box(b)], [[0, 0, 1056, 1080], [1056, 0, 864, 540], [1056, 540, 864, 540]]);
+  a.minimized = true;
+  assert.deepEqual([box(c), box(b)], [[0, 0, 1056, 1080], [1056, 0, 864, 1080]]);
+  const n = ws.open();
+  // c stays the master; n is the top of the stack
+  assert.deepEqual([box(c), box(n), box(b)], [[0, 0, 1056, 1080], [1056, 0, 864, 540], [1056, 540, 864, 540]]);
+});
+
 test("a key that fails is logged, and the rest go on", () => {
   const { ws, env, tide } = start();
   tide.zoom = () => {
