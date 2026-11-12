@@ -15,7 +15,8 @@
 // with no Plasma. Plasma reads its shortcuts as the session starts, so
 // they take effect at the next login.
 import { execFileSync } from "node:child_process";
-import { appendFileSync } from "node:fs";
+import { appendFileSync, realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { KEYS } from "../src/keys.js";
 
 // The Plasma shortcuts that hold tide's keys, as Plasma 6.7 binds them:
@@ -208,4 +209,12 @@ function main() {
   if (!batch) console.log("tide's keys take over from Plasma's at the next login.");
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main();
+// Whether node was run on this file, rather than a test importing it. The
+// two are compared as real paths: this module's URL escapes a space and has
+// its links resolved, where the path node was given has neither.
+function isMain() {
+  const script = process.argv[1];
+  return script !== undefined && realpathSync(script) === realpathSync(fileURLToPath(import.meta.url));
+}
+
+if (isMain()) main();
