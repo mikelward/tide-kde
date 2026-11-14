@@ -1,6 +1,7 @@
 // tide-kde's settings, from KWin's config for the script (kwinrc's
-// [Script-tide-kde] group, which the script's settings dialog writes), in
-// tide's names where tide has them (tide SPEC.md §16). Free of KWin's API:
+// [Script-tide] group, which you write with kwriteconfig6, as the README
+// says; there's no settings dialog), in tide's names where tide has them
+// (tide SPEC.md §16). Free of KWin's API:
 // `read(key)` gives a setting's value as KWin's readConfig does, or
 // undefined when it isn't set.
 //
@@ -12,7 +13,7 @@ import * as workspaces from "./workspaces.js";
 const MODES = ["tile", "threecol", "twocol", "monocle"];
 const NEW_WINDOW = ["end", "top", "next", "master"];
 
-// Every setting, with its default as the settings dialog shows it.
+// Every setting, with its default as the README's table shows it.
 export const KEYS = {
   standing: workspaces.DEFAULT_STANDING.join(", "),
   ultrawideAspect: String(layout.DEFAULTS.ultrawideAspect),
