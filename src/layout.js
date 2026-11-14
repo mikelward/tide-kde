@@ -121,12 +121,12 @@ export function swapMaster(part, ids, id) {
 
 export function mfact(part, delta) {
   const o = part.opts[part.mode];
-  if (o?.mfact !== undefined) o.mfact = Math.round(geometry.clamp(o.mfact + delta, 0.1, 0.9) * 1000) / 1000;
+  if (o?.mfact !== undefined) o.mfact = Math.round(geometry.clamp(o.mfact + delta, geometry.MFACT_MIN, geometry.MFACT_MAX) * 1000) / 1000;
 }
 
 export function setMfact(part, value) {
   const o = part.opts[part.mode];
-  if (o?.mfact !== undefined) o.mfact = geometry.clamp(value, 0.1, 0.9);
+  if (o?.mfact !== undefined) o.mfact = geometry.clamp(value, geometry.MFACT_MIN, geometry.MFACT_MAX);
 }
 
 // The fewest masters each mode with a master takes, as tide's
