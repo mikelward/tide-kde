@@ -17,12 +17,18 @@ jobs:
           repository: mikelward/tideco
           path: tideco
           persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: mikelward/tide
+          path: tide
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - run: make lint
       - run: make test
       - run: make check-tideco TIDECO=tideco
+      - run: make check-tide-defaults TIDE=tide
   # The script in a real, headless KWin. Ubuntu's devel release packages
   # KWin 6; Debian testing has no kwin-wayland.
   kwin:

@@ -240,6 +240,11 @@ binds `Meta+Space` to it.
   numbers.
 - **tide.js** runs on a fake KWin (`src/fake_kwin.js`) for what a
   headless KWin can't be made to do, such as a drag.
+- **Defaults.** `make check-tide-defaults`, in CI against a tide
+  checkout, fails when a default tide on KDE restates drifts from tide's:
+  the layouts' main shares and counts, the cycle, where a new window goes,
+  the ultrawide aspect, the lone-window rules, the main share's step and
+  bounds, and the standing workspaces.
 - **Against KWin.** `make test-kwin` runs a headless `kwin_wayland
   --virtual` per test, with the script loaded over D-Bus or installed as
   a user would. It opens foot windows, presses tide's keys through
