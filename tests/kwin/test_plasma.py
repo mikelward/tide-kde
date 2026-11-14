@@ -66,6 +66,30 @@ class WidgetTest(PlasmaTest):
 
 
 @unittest.skipUnless(REQUIRED or shutil.which(PLASMASHELL), "no plasmashell")
+class PanelTest(PlasmaTest):
+    def area(self, full):
+        """KWin's placement area, once a panel has taken room from `full`,
+        as tide moving a window says."""
+        while True:
+            area = tuple(self.state()["area"])
+            if area != full:
+                return area
+            self.log.wait(lambda l: "probe: geometry " in l, "a window making room for the panel")
+
+    def test_tiles_follow_the_room_panels_leave(self):
+        self.shows("[]=")
+        self.open("one")
+        # Plasma's panels come and go after tide has laid out, as at login
+        self.qdbus("org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript",
+                   "panels().forEach((p) => p.remove());")
+        full = (0, 0, self.WIDTH, self.HEIGHT)
+        self.settled({"one": full})
+        self.qdbus("org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript",
+                   'const p = new Panel; p.location = "bottom";')
+        self.settled({"one": self.area(full)})
+
+
+@unittest.skipUnless(REQUIRED or shutil.which(PLASMASHELL), "no plasmashell")
 class SetupTest(PlasmaTest):
     def test_setup_gives_the_lock_screen_the_desktops_wallpaper_and_adds_the_widget_once(self):
         self.shows("[]=")

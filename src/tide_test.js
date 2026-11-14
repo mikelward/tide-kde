@@ -409,3 +409,16 @@ test("a click on a monitor's widget changes that monitor's layout", () => {
   env.press("tide-next-layout-here");
   assert.deepEqual(announced(env), { A: { symbol: "[]=", mode: "tile" }, B: { symbol: "|M|", mode: "threecol" } });
 });
+
+test("tiles make room for a panel as it comes, changes and goes", () => {
+  const { ws, env } = start();
+  const a = ws.open();
+  const panel = ws.open({ dock: true, normalWindow: false, frameGeometry: { x: 0, y: 1040, width: 1920, height: 40 } });
+  assert.deepEqual(box(a), [0, 0, 1920, 1040]);
+  panel.frameGeometry = { x: 0, y: 1000, width: 1920, height: 80 };
+  panel.frameGeometryChanged.emit();
+  assert.deepEqual(box(a), [0, 0, 1920, 1000]);
+  ws.close(panel);
+  env.settle();
+  assert.deepEqual(box(a), [0, 0, 1920, 1080]);
+});
