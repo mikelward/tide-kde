@@ -95,7 +95,7 @@ export class Tide {
     this.dim = loaded.dim;
     for (const e of loaded.errors) this.problem(`setting ${e}; using its default`);
 
-    this.ensureHome();
+    this.ensureStanding();
     this.ws.windowAdded.connect((w) => this.added(w));
     this.ws.windowRemoved.connect((w) => this.removed(w));
     this.ws.currentDesktopChanged.connect((previous) => this.desktopChanged(previous));
@@ -655,13 +655,19 @@ export class Tide {
     };
   }
 
-  // Home is made at start: the first desktop takes its name, unless one has
-  // it already.
-  ensureHome() {
+  // Every standing workspace is made at start. Home takes the first
+  // desktop's name, unless a desktop has it already; each other one missing
+  // is made in its place.
+  ensureStanding() {
     const home = this.standing[0];
-    if (this.ws.desktops.some((d) => workspaces.sameName(d.name, home))) return;
-    this.ws.desktops[0].name = home;
-    this.log(`named the first desktop ${home}, tide's home`);
+    if (!this.ws.desktops.some((d) => workspaces.sameName(d.name, home))) {
+      this.ws.desktops[0].name = home;
+      this.log(`named the first desktop ${home}, tide's home`);
+    }
+    for (const name of workspaces.missing(this.view())) {
+      this.ws.createDesktop(workspaces.position(this.view(), name), name);
+      this.log(`made ${name}, a standing workspace`);
+    }
   }
 
   // The desktop for bar entry `entry` ({name, desktop}), making it if it's

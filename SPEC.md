@@ -118,7 +118,7 @@ Status: **yes**, **partial**, **no**, or **differs** (done another way).
 |---|---|---|
 | Workspaces spanning every monitor | yes | KWin's virtual desktops |
 | Named, made and removed on demand | yes | `createDesktop`, `removeDesktop`, and the desktop's name |
-| `in`, `re`, `oc`, `me` standing | yes | Made at start if missing |
+| `in`, `re`, `oc`, `me` standing | differs | Made at start if missing, and kept even empty, so Plasma's Pager lists them all. tide for Linux makes them on demand |
 | A monitor's part, `@` | differs | KWin has no per-monitor desktop. Each monitor's windows are laid out on their own already |
 | Minimize and restore (`Super+Z`) | yes | A window's `minimized` |
 | Move a window to a monitor | yes | `sendToOutput` |

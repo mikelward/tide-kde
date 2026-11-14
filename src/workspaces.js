@@ -3,9 +3,9 @@
 //
 // The rules are tide's (tide SPEC.md §6.5): the standing names come first,
 // home leading, made or not; the rest follow in the order they were made.
-// Home is made at start and never removed. Another standing one is made the
-// first time you go there or send a window there, and stays. The rest go
-// once you leave them empty.
+// Every standing one is made at start if it's missing, and stays. One
+// removed since, in Plasma's Pager say, is made again the first time you go
+// there or send a window there. The rest go once you leave them empty.
 //
 // A view is {standing, desktops, current, recent}: `desktops` is KWin's
 // list in its order, each {id, name, windows}, `windows` being how many it
@@ -137,6 +137,12 @@ export function position(view, name) {
     if (before.some((n) => sameName(n, d.name))) at = k + 1;
   });
   return at;
+}
+
+// The standing names no desktop has yet, in their order: the ones to make
+// at start.
+export function missing(view) {
+  return view.standing.filter((n) => !find(view, n));
 }
 
 // The desktops to remove: those not standing, with no window, that aren't
