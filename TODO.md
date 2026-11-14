@@ -52,3 +52,6 @@
   as tide for Linux's keys are. They were `Meta+Up`, `Meta+Shift+Up` and
   `Meta+Down` (restore), copied from tide for Chrome, where chromeOS
   forces them; KWin doesn't. Restore has no key, as in tide.
+- The README's table of keys is gone: tide for Linux's SPEC.md §6.6 has
+  one table for every platform, with a KDE column, so the README keeps
+  how the keys are bound and the Plasma keys `make setup` frees.
