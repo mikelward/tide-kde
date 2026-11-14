@@ -1,31 +1,36 @@
 # tide-kde: tide on KDE Plasma
 
 **Status: the basics are built:** the layouts, the mouse, floating, the
-workspaces and their keys, and settings (§4). The rest of this explores
-what KWin allows. It takes what tide for Linux does under Hyprland
-([mikelward/tide](https://github.com/mikelward/tide)), and what tidewm and
-tidesway carry of it in their compositors
+workspaces and their keys, dimming inactive windows, the layout widget,
+setup and releases (§4); the settings are in the README. The rest of
+this explores what KWin allows. It takes what tide for Linux does under
+Hyprland ([mikelward/tide](https://github.com/mikelward/tide)), and what
+tidewm and tidesway carry of it in their compositors
 ([mikelward/tidewm](https://github.com/mikelward/tidewm),
-[mikelward/tidesway](https://github.com/mikelward/tidesway)), and says, for
-each one, how Plasma can do it, how well, and at what cost.
+[mikelward/tidesway](https://github.com/mikelward/tidesway)), and says,
+for each one, how Plasma can do it, how well, and at what cost.
 
-Claims about KWin carry a source: KWin 6.7.5 as Ubuntu packages it, read
-with `strings` over `libkwin.so` and its plugins, or KWin's source. The rest
-are marked *(unverified)*. References like "tide §6.1" are to tide's
-`SPEC.md`.
+Claims about KWin carry a source: KWin 6.7.5, the release Ubuntu's devel
+release packages and CI tests, read in its source, with `strings` over
+`libkwin.so` and its plugins, or in a headless KWin (§6). Plasma's other
+parts are read at the same release. The rest are marked *(unverified)*.
+References like "tide §6.1" are to tide for Linux's `SPEC.md`.
 
 ## 1. Goals
 
 - **tide's window management on Plasma:** its layouts, the single-window
-  rule, the dim, named workspaces that span every monitor, the focus guard
-  and its keys (tide §6, §14).
+  rule, dimming inactive windows, named workspaces that span every
+  monitor, the focus guard and its keys (tide §6, §14).
 - **tide's launcher with its tabs.** tide's Plasma launcher (tide §8.5)
   stays tide's, and reads KWin's desktops and windows itself (§4.6).
 - **Plasma stays Plasma.** Its panel, notifications, lock, login and
   settings stay its own. tide-kde adds to them; it replaces none, except
-  where tide §5.5 already does (the launcher on `Meta+Space`).
-- **Off is Plasma as it was.** Disabling the script, or stopping
-  `tide-kde.service`, leaves stock Plasma, with nothing left to undo.
+  Plasma's keys that tide's take (§4.5) and, as tide §5.5 already does,
+  the launcher on `Meta+Space`.
+- **Off undoes the script.** Disabling the script, or stopping
+  `tide-kde.service`, leaves nothing of either to undo. What `make setup`
+  changed (the README's Setup) stays until undone; an undo for it is
+  planned (TODO.md).
 - **Say what can't be done,** as tidemo does for macOS (§4).
 
 ## 2. What KWin allows
@@ -33,13 +38,16 @@ are marked *(unverified)*. References like "tide §6.1" are to tide's
 KWin 6 runs scripts in JavaScript or QML, packaged with a
 `metadata.json` and installed with `kpackagetool6 --type KWin/Script`
 (tested in CI, §6). A script sees and moves every window. It can't draw
-outside QML, can't veto a close, and can't take a key an app asks for.
+outside QML, and can't veto a close: a window has no signal it could
+stop one with (KWin's `src/window.h`). Its keys are global shortcuts, so
+it can't take a key from one app alone *(unverified)*.
 
-A script's settings are its group in `kwinrc`, `[Script-<id>]`, which
-`readConfig(key, default)` reads; with no default it gives nothing, even
-for a key that's set. A script can't read other files, so tide's
-`layouts.json` (tide §16) can't reach it: its settings are its own
-(README.md).
+A script's settings are its group in `kwinrc`, `[Script-<id>]` (KWin's
+`Script::config`), which `readConfig(key, default)` reads. It hands the
+default to KConfig's `readEntry`, which reads the value as the default's
+type, so with no default it gives nothing, even for a key that's set. A
+script can't read other files, so tide's `layouts.json` (tide §16) can't
+reach it: its settings are its own (README.md).
 
 KWin's script engine is Qt's QV4. ES modules don't load in it, so
 `scripts/bundle.mjs` joins `src/` into one script. A headless KWin shows
@@ -51,26 +59,30 @@ each:
 - `\p{...}` in a regular expression: it matches nothing.
 - `Object.fromEntries` and `structuredClone`: they're undefined.
 
-What KWin 6.7.5's script API has, by the names in `libkwin.so`:
+What `tide.js` calls of KWin's script API (KWin's
+`src/scripting/workspace_wrapper.h`, `src/window.h` and
+`src/scripting/scripting.cpp`):
 
 | Area | Names |
 |---|---|
-| Windows | `workspace.windowList`, `stackingOrder`, `activeWindow`; a window's `frameGeometry`, `minimized`, `keepAbove`, `closeWindow` |
-| Window signals | `windowAdded`, `windowRemoved`, `windowActivated`; a window's `interactiveMoveResizeStarted`, `interactiveMoveResizeFinished`, `tileChanged`, `maximizedAboutToChange` |
-| Desktops | `currentDesktop`, `createDesktop`, `removeDesktop`; `desktopsChanged`, `currentDesktopChanged` |
-| Screens | `clientArea`, `screenAt`, `outputAt`, `sendToOutput`; `screensChanged` |
+| Windows | `workspace.windowList`, `activeWindow`; a window's `frameGeometry`, `output`, `desktops`, `activities`, `minimized`, `fullScreen`, `maximizeMode`, `setMaximize`, `closeWindow`, and what kind it is (`normalWindow`, `dialog`, `dock`, `transient`, `minSize`, `maxSize` and more) |
+| Window signals | `windowAdded`, `windowRemoved`, `windowActivated`; a window's `frameGeometryChanged`, `outputChanged`, `desktopsChanged`, `activitiesChanged`, `minimizedChanged`, `fullScreenChanged`, `maximizedChanged`, `interactiveMoveResizeStarted`, `interactiveMoveResizeFinished` |
+| Desktops | `desktops`, `currentDesktop`, `createDesktop`, `removeDesktop`; `desktopsChanged`, `currentDesktopChanged`; `currentActivity`, `currentActivityChanged` |
+| Screens | `screens`, `activeScreen`, `clientArea`, `screenAt`, `cursorPos`, `sendClientToScreen`; the slots `slotSwitchToLeftScreen`, `slotSwitchToRightScreen`, `slotSwitchToAboveScreen` and `slotSwitchToBelowScreen`; `screensChanged`, `virtualScreenGeometryChanged` |
 | Keys | `registerShortcut`, a global shortcut under KGlobalAccel |
-| Elsewhere | `callDBus`, to reach tide-kde's launcher or anything else on the session bus |
+| Elsewhere | `readConfig`; `callDBus`, for a notification, the layout widget (§4.7), and Dim Inactive: KWin's own `org.kde.kwin.Effects` `loadEffect` and `unloadEffect` (`src/effect/effecthandler.h`) |
 
 And in KWin's own settings and effects:
 
-- **Dim Inactive** is a stock effect (`kwin_diminactive_config.so`).
+- **Dim Inactive** is a stock effect (`src/plugins/diminactive`).
 - **Focus stealing prevention** is a setting,
-  `focusStealingPreventionLevel`, from None to Extreme.
-- **X11 scaling**: `XwaylandClientsScale`, as Hyprland's
-  `xwayland:force_zero_scaling` and tidesway's `xwayland_scaling`.
-- **`closeRequested`** exists. Whether a script can stop a close with it
-  is *(unverified)*, and likely not.
+  `focusStealingPreventionLevel`, from None to Extreme (`src/options.h`).
+- **X11 scaling**: `XwaylandClientsScale` (`src/workspace.cpp`), as
+  Hyprland's `xwayland:force_zero_scaling` and tidesway's
+  `xwayland_scaling`.
+- **`closeRequested`** is a task manager asking KWin to close a window,
+  over Plasma's window management protocol
+  (`src/wayland/plasmawindowmanagement.h`). A script never sees it.
 
 KWin's virtual desktops span every monitor, as tide's workspaces do
 (tide §6.5), so that part is free.
@@ -96,7 +108,7 @@ can't reach (§4).
 
 Status: **yes**, **partial**, **no**, or **differs** (done another way).
 
-### 4.1 Layouts (tide §6.1, §6.3)
+### 4.1 Layouts (tide §6.1, §6.3, §6.4)
 
 | Feature | Status | How |
 |---|---|---|
@@ -104,17 +116,18 @@ Status: **yes**, **partial**, **no**, or **differs** (done another way).
 | Three columns at aspect ≥ 2.1, master centered at 50% | yes | Script geometry |
 | Two columns plus a stack; monocle | yes | Script geometry |
 | `mfact`, `nmaster` keys | yes | `registerShortcut` |
-| Single window at 80% on a wide monitor (60% at 32:9) | yes | Script geometry, per output |
+| Single window at 80% on a wide monitor (60% from 3.2) | yes | Script geometry, by each monitor's aspect |
 | Drag to swap; edge drag to set the split | partial | `interactiveMoveResizeFinished` tells where a drag ended; the script re-lays out from there. Mid-drag feedback is KWin's *(unverified)* |
-| Maximize and fullscreen | yes | KWin's own; the script leaves them be |
+| Maximize and fullscreen | yes | KWin's own, `setMaximize` and `fullScreen`, on tide for Linux's keys; such a window leaves the layout |
+| Floating: dialogs, fixed-size windows, windows on every desktop, and the float key | yes | The script leaves them out of the layout, where KWin placed them |
 
-### 4.2 The dim (tide §6.2)
+### 4.2 Dimming inactive windows (tide §6.2)
 
 | Feature | Status | How |
 |---|---|---|
-| Dim inactive windows | yes | Dim Inactive, at a strength set in its settings (`[Effect-diminactive]` `Strength`, a percentage). tide §6.2 found KDE's dim looks weaker than Hyprland's at the same number |
-| No dim with one window | differs | The effect is all or nothing, so the script loads it only while some monitor shows two windows or more, and unloads it otherwise, over KWin's own D-Bus (`org.kde.kwin.Effects`). A lone window on one monitor dims while the other monitor shows two |
-| `nodim` for video and calls | no | Dim Inactive has no rule for a window; it leaves out panels, the desktop, keep-above and fullscreen windows by its own settings |
+| Dim inactive windows | yes | Dim Inactive, at a strength set in its settings (`[Effect-diminactive]` `Strength`, a percentage). tide §6.2 found KDE's dimming looks weaker than Hyprland's at the same number |
+| No dimming with one window | differs | The effect has no rule for that (its `canDimWindow`), so the script loads it only while some monitor shows two windows or more, and unloads it otherwise, over KWin's own D-Bus (`org.kde.kwin.Effects`). A lone window on one monitor dims while the other monitor shows two |
+| `nodim` for video and calls | no | Dim Inactive has no rule for a window; it leaves out panels, the desktop, keep-above and fullscreen windows by its own settings (`canDimWindow`) |
 
 ### 4.3 Workspaces and monitors (tide §6.5, §6.7)
 
@@ -124,8 +137,8 @@ Status: **yes**, **partial**, **no**, or **differs** (done another way).
 | Named, made and removed on demand | yes | `createDesktop`, `removeDesktop`, and the desktop's name |
 | `in`, `re`, `oc`, `me` standing | differs | Made at start if missing, and kept even empty, so Plasma's Pager lists them all. tide for Linux makes them on demand |
 | A monitor's part, `@` | differs | KWin has no per-monitor desktop. Each monitor's windows are laid out on their own already |
-| Minimize and restore (`Super+Z`) | yes | A window's `minimized` |
-| Move a window to a monitor | yes | `sendToOutput` |
+| Minimize and restore (`Meta+Z`) | yes | A window's `minimized` |
+| Move a window to a monitor | yes | `sendClientToScreen`, by the arrows' rule (tide §6.6) |
 
 ### 4.4 Focus and attention (tide §14)
 
@@ -141,7 +154,7 @@ Status: **yes**, **partial**, **no**, or **differs** (done another way).
 |---|---|---|
 | tide's window and workspace keys | yes | `registerShortcut`, under `Meta`, as tide for Linux binds them under `Super`. Plasma binds none of `Meta+X`, `Meta+Shift+X`, `Meta+Shift+Up` or `Meta+Shift+Down` (KWin's, plasma-workspace's and plasma-desktop's source) |
 | A key Plasma already has | yes | KGlobalAccel gives the key to both, and a press goes to the shortcut made first, Plasma's (kglobalacceld's `GlobalShortcutsRegistry::activeShortcutByKey`). `make setup` (`scripts/setup.mjs`) takes Plasma's off it in `kglobalshortcutsrc`, keeping their other keys, and binds tide's; KGlobalAccel reads them as the session starts |
-| `keep_open`: an app's close key doesn't close it | no | A script can't take an app's own keys, or veto a close (§2) |
+| Pinned apps: an app's close key doesn't close it | no | A script can't take one app's keys, or veto a close (§2). tidewm does it with `keep_open` |
 
 ### 4.6 Launcher (tide §8)
 
@@ -157,25 +170,29 @@ Status: **yes**, **partial**, **no**, or **differs** (done another way).
   workspaces by name. tide's own bar could run on Plasma later, fed by
   the script over D-Bus as a third backend beside Hyprland's and
   tidewm's (tide `shell/Compositor.qml`), but that's much more work.
-  - Tiles keep out of the panels' room, KWin's placement area. KWin has
-    no signal for that area changing, so tide lays out again as a panel
-    comes, moves or goes. Plasma's come after tide's first layout at
-    login. For one that goes, KWin updates the area only after a timer
-    it starts once scripts have heard, so tide looks again over the next
+  - Tiles keep out of the panels' room, KWin's placement area. KWin gives
+    scripts no signal for that area changing (`workspace_wrapper.h`), so
+    tide lays out again as a panel comes, moves or goes. Plasma's come
+    after tide's first layout at login. For one that goes, KWin updates
+    the area only on a timer it starts once scripts have heard
+    (`Workspace::scheduleRearrange`), so tide looks again over the next
     few turns of KWin's event loop (`later` in `main.js`).
 - **The layout symbol** is in a panel widget of its own, `plasmoid/`,
   showing the layout of the workspace on its panel's monitor, as tide's
   bar does. A click is the next layout.
-  - A script can call D-Bus but can't be called, so it can't serve the
-    widget. Instead it writes the widget's settings through plasmashell's
-    scripting (`org.kde.PlasmaShell.evaluateScript`, `writeConfig` then
-    `reloadConfig`), which the widget follows at once. It writes them only
-    when a layout changes.
+  - A script can call D-Bus but can't be called: the script API has
+    `callDBus` and nothing to serve a call (`scripting.cpp`). So it can't
+    serve the widget. Instead it writes the widget's settings through
+    plasmashell's scripting (`org.kde.PlasmaShell.evaluateScript`,
+    `writeConfig` then `reloadConfig`), which the widget follows at once.
+    It writes them only when a layout changes.
   - A widget just added, or a plasmashell just started, asks for them
     by pressing a shortcut tide has with no key, `tide-announce`, through
     KGlobalAccel's `invokeShortcut`, with Plasma's QML D-Bus module
-    (`org.kde.plasma.workspace.dbus`). A click presses `tide-next-layout`
-    the same way.
+    (`org.kde.plasma.workspace.dbus`). A click presses
+    `tide-next-layout-here` the same way: the next layout on the monitor
+    under the pointer, which is the clicked widget's, wherever the focus
+    is.
 - **Login** is tide's greeter (tide §11), which already lists every
   session greetd can start, Plasma's among them. An SDDM theme could
   match it, but needn't. Plasma's Switch User asks the display manager
@@ -196,7 +213,8 @@ Status: **yes**, **partial**, **no**, or **differs** (done another way).
     either way, and `kscreenlockerrc` names none.
   - So the way in is upstream: a `kscreenlockerrc` setting naming the
     package the greeter takes its lock screen from, falling back to the
-    shell's. Until then, Plasma's own face shows.- **Notifications, idle, screenshots and the theme** stay Plasma's.
+    shell's. Until then, Plasma's own face shows.
+- **Notifications, idle, screenshots and the theme** stay Plasma's.
   Their tide versions (tide §9, §10, §13, §15) need a session Plasma
   doesn't share.
 
@@ -226,8 +244,8 @@ binds `Meta+Space` to it.
   --virtual` per test, with the script loaded over D-Bus or installed as
   a user would. It opens foot windows, presses tide's keys through
   KGlobalAccel's `invokeShortcut`, and reads what a probe script prints
-  to KWin's log. CI runs it in Ubuntu's devel release, which packages
-  KWin 6.7.5; Debian testing has no `kwin-wayland` package now.
+  to KWin's log. CI runs it in Ubuntu's devel release, the one that
+  packages KWin 6; Debian testing has no `kwin-wayland` package now.
   - A container can't grant `kwin_wayland` its `CAP_SYS_NICE`, so the
     kernel won't run it there. A copy without the capability runs, if it
     keeps its name: KWin's own platform plugin checks it.
@@ -237,12 +255,24 @@ binds `Meta+Space` to it.
 
 1. **The focus guard.** Is KWin's prevention at Medium close enough to
    tide §14.1, or does the script need its own rules on `windowAdded`?
-2. **`keep_open`.** Without it, `Ctrl+Q` closes a browser on Plasma. Say
+2. **Pinned apps.** Without them, `Ctrl+Q` closes a browser on Plasma. Say
    so, or ask KWin upstream for a veto?
 
 ## Sources
 
-- KWin 6.7.5, Ubuntu devel's `kwin-wayland` and `libkwin6` packages:
-  `strings` over `libkwin.so.6` and `kwin_diminactive_config.so`, and
-  `kwin_wayland --help`.
-- tide's `SPEC.md`: §3.1, §5.5, §6, §8.5, §14.
+- KWin's source at that release, in KDE's `kwin` repository: the script
+  API (`src/scripting/`), `src/window.h`, `src/workspace.cpp`,
+  `src/options.h`, `src/effect/effecthandler.h` and Dim Inactive
+  (`src/plugins/diminactive/`).
+- Ubuntu devel's `kwin-wayland` and `libkwin6` packages: `strings` over
+  `libkwin.so.6` and `kwin_diminactive_config.so`, and `kwin_wayland
+  --help`.
+- A headless `kwin_wayland --virtual`: `make test-kwin` (§6), and the
+  lock screen's shell package (§4.7).
+- kglobalacceld's `src/globalshortcutsregistry.cpp` and
+  `src/globalshortcut.cpp`: two shortcuts on one key (§4.5).
+- kscreenlocker's `UnlockApp::setShell` (§4.7).
+- plasma-workspace's and plasma-desktop's source: the keys Plasma binds
+  (§4.5).
+- tide for Linux's `SPEC.md`: §3.1, §5.5, §6 (§6.1 to §6.7), §8 and
+  §8.5, §9, §10, §11, §13, §14 and §14.1, §15, §16.

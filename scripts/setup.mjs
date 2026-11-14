@@ -1,5 +1,5 @@
 // Sets Plasma up for tide (README.md's Setup): frees the Plasma shortcuts
-// tide's keys take and binds tide's, sets the dim and focus stealing
+// tide's keys take and binds tide's, sets dimming and focus stealing
 // prevention, turns the script on, puts the layout widget on the first
 // panel, and gives the lock screen the desktop's wallpaper. `make setup` runs it; scripts' setup-kde can.
 //

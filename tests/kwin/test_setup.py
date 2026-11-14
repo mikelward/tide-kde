@@ -41,7 +41,7 @@ class SetupTest(KWinTest):
         self.assertEqual(after["tide-previous-workspace"], [META | PAGE_UP])
         self.assertNotIn(ALT | TAB, after["Walk Through Windows"])
         self.assertIn(ALT | SHIFT | TAB, after["Walk Through Windows (Reverse)"], "what tide doesn't take stays")
-        # And the dim's settings are in
+        # And Dim Inactive's settings are in
         self.assertEqual(self.qdbus("org.kde.KWin", "/Effects", "org.kde.kwin.Effects.isEffectSupported", "diminactive"), "true")
 
 

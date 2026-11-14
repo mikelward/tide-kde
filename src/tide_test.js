@@ -418,7 +418,7 @@ function effects(env) {
   return env.calls.filter((c) => c[2] === "org.kde.kwin.Effects").map((c) => c[3]);
 }
 
-test("the dim is on only while a monitor shows two windows", () => {
+test("dimming is on only while a monitor shows two windows", () => {
   const { ws, env } = start();
   assert.deepEqual(effects(env), ["unloadEffect"]);
   ws.open();
@@ -436,7 +436,7 @@ test("one window on each of two monitors isn't dimmed", () => {
   assert.deepEqual(effects(env), ["unloadEffect"]);
 });
 
-test("a window on every desktop counts toward the dim", () => {
+test("a window on every desktop counts toward dimming", () => {
   const { ws, env } = start();
   ws.open();
   const sticky = ws.open({ _desktops: [] });
