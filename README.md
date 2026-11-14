@@ -55,32 +55,17 @@ Widgets → Get New → Install Widget From Local File.
 
 ## Keys
 
-`Meta` is the Super key. They're KWin global shortcuts, under "KWin" in
-System Settings → Keyboard → Shortcuts, each starting `tide:`, where you
-can change them.
+tide for Linux's window and workspace keys, with `Meta` for Super. Its
+[SPEC.md §6.6](https://github.com/mikelward/tide/blob/main/SPEC.md#66-keys)
+lists them in one table with every platform's, and its KDE column is this
+script's. None differs from tide for Linux's, but `Meta+Backspace` closes
+a pinned window too (SPEC.md §4.5).
 
-| Keys | Action |
-|---|---|
-| `Meta+J` / `Meta+K` | focus the next / previous window in the stack |
-| `Meta+Shift+J` / `Meta+Shift+K` | move the window down / up the stack |
-| `Meta+Left` / `Right` / `Up` / `Down` | focus the window that way; at a monitor's edge, the nearest on the next monitor |
-| `Meta+Shift+Left` / `Right` / `Up` / `Down` | move the window that way: swap on the monitor, or onto the next one, landing at the edge it came in by |
-| `Alt+Tab` | make the window the master; on the master, swap with the one before |
-| `Meta+\` / `Meta+/` | grow / shrink the master |
-| `Meta+=` / `Meta+-` | add / remove a master |
-| `Meta+.` / `Meta+,` | next / previous layout |
-| `Meta+O`, ``Meta+` `` | toggle monocle |
-| `Meta+Backspace` | close the window |
-| `Meta+Z` | minimize the window |
-| `Meta+X` / `Meta+Shift+X` | toggle maximize / fullscreen |
-| `Meta+Shift+F`, `Meta+Ins` | toggle floating |
-| `Meta+1…9` / `Meta+0` | go to the Nth / last workspace |
-| `Meta+Shift+1…9` / `Meta+Shift+0` | send the window to the Nth / last workspace |
-| `Meta+Home` | go to home |
-| `Meta+Tab` | flip between home and the last workspace |
-| `Meta+End` | go to the last workspace other than home; again, the one before it, so presses flip between two |
-| `Meta+PgUp` / `Meta+PgDown` | previous / next workspace with a window |
-| `Meta+Shift+PgUp` / `Meta+Shift+PgDown` | move the window to the previous / next workspace |
+They're KWin global shortcuts, under "KWin" in System Settings →
+Keyboard → Shortcuts, each starting `tide:`, where you can change them.
+The layout used last and restore are there with no key, as in tide for
+Linux. tide's other keys, such as the picker or lock, are Plasma's own
+here, or have none.
 
 Plasma holds some of these keys too: `Alt+Tab` and `Meta+Tab` (the task
 switcher), ``Meta+` `` (its windows of one app), `Meta+1…9` (the task
