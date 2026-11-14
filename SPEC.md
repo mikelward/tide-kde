@@ -41,11 +41,15 @@ for a key that's set. A script can't read other files, so tide's
 `layouts.json` (tide §16) can't reach it: its settings are its own
 (README.md).
 
-KWin's script engine is Qt's QV4. A headless KWin 6.7.5 shows what it
-lacks of what Node runs: object spread fails to load, `\p{...}` in a
-regular expression matches nothing, and there's no `Object.fromEntries`
-or class fields. ES modules don't load either, so `scripts/bundle.mjs`
-joins `src/` into one script, and refuses what QV4 can't run.
+KWin's script engine is Qt's QV4. ES modules don't load in it, so
+`scripts/bundle.mjs` joins `src/` into one script. A headless KWin shows
+what else QV4 lacks of what Node runs, and `scripts/bundle.mjs` refuses
+each:
+
+- Object spread, `{ ...x }`, and class fields, public, static or
+  private: the script fails to load.
+- `\p{...}` in a regular expression: it matches nothing.
+- `Object.fromEntries` and `structuredClone`: they're undefined.
 
 What KWin 6.7.5's script API has, by the names in `libkwin.so`:
 

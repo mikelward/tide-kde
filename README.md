@@ -148,8 +148,8 @@ tide's face on it needs a change to Plasma (SPEC.md §4.7).
 there's one (Ubuntu's `plasma-desktop`), as CI's `plasma` job does.
 `make test-kwin` needs `kwin_wayland`, KWin's package structures (Debian's and Ubuntu's `kwin-common`), `kpackagetool6`, `foot`, `qdbus6`
 and `dbus-run-session`; CI runs it on Ubuntu's devel release. KWin's
-script engine has no object spread, no `\p{...}` in regular expressions
-and no `Object.fromEntries`; `scripts/bundle.mjs` refuses them.
+script engine lacks some of what Node runs, which `scripts/bundle.mjs`
+refuses (SPEC.md §2).
 
 ## License
 
