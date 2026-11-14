@@ -14,6 +14,39 @@ function varName(path) {
   return "__" + relative(dirname(entry), path).replace(/\.js$/, "").replace(/\W/g, "_");
 }
 
+// Whether `code` gives a class a field: public, static or private. Of each
+// class body, only what's directly in it counts, not what's inside its
+// methods' parentheses and braces; there, a field is a name set with `=`
+// or ended by `;`, where a method has its parameters. Strings are passed
+// over, so a brace in one doesn't count.
+function hasClassField(code) {
+  const start = /\bclass\b[^{]*\{/g;
+  while (start.exec(code) !== null) {
+    let braces = 1;
+    let parens = 0;
+    let body = "";
+    let quote = null;
+    let i = start.lastIndex;
+    for (; i < code.length && braces > 0; i++) {
+      const c = code[i];
+      if (quote) {
+        if (c === "\\") i++;
+        else if (c === quote) quote = null;
+        continue;
+      }
+      if (c === '"' || c === "'" || c === "`") quote = c;
+      else if (c === "{") braces++;
+      else if (c === "}") braces--;
+      else if (c === "(") parens++;
+      else if (c === ")") parens--;
+      else if (braces === 1 && parens === 0) body += c;
+    }
+    if (/(^|[;\n])\s*(static\s+)?#?[A-Za-z_$][\w$]*\s*(=(?![=>])|;)/.test(body)) return true;
+    start.lastIndex = i;
+  }
+  return false;
+}
+
 function load(path) {
   if (done.has(path)) return done.get(path);
   const name = varName(path);
@@ -30,13 +63,14 @@ function load(path) {
     return "";
   });
   if (/^\s*import\b/m.test(text)) throw new Error(`${path}: an import this bundler can't take`);
-  // What KWin's script engine (QV4) can't run, found in a headless KWin:
-  // it would fail to load, or, for \\p, silently match nothing.
+  // What KWin's script engine (QV4) can't run, as SPEC.md §2 lists it: it
+  // would fail to load, or, for \\p, silently match nothing.
   const unsupported = [
     [/\{\s*\.\.\./, "object spread"],
     [/\\p\{/, "a Unicode property escape"],
     [/Object\.fromEntries/, "Object.fromEntries"],
     [/structuredClone/, "structuredClone"],
+    [{ test: hasClassField }, "a class field"],
   ];
   const code = text.replace(/^\s*\/\/.*$/gm, "");
   for (const [re, what] of unsupported) {
