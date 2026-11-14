@@ -4,8 +4,8 @@
 // Settings shows, `key` the default, written as Qt writes it, and `action`
 // the Tide method a press calls, with `arg`.
 //
-// A default only binds where no other shortcut holds the key; Plasma holds
-// some of tide's (Alt+Tab, Meta+1…9, Meta+Left/Right), and setup frees them
+// Where Plasma holds a key too (Alt+Tab, Meta+1…9, the arrows), both have
+// it and a press goes to Plasma's, the older shortcut; setup frees Plasma's
 // (SPEC.md §4.5).
 
 const SHIFTED_DIGITS = [")", "!", "@", "#", "$", "%", "^", "&", "*", "("];
@@ -36,6 +36,10 @@ export const KEYS = [
   { name: "tide-focus-right", title: "Focus the window to the right", key: "Meta+Right", action: "focusSide", arg: 1 },
   { name: "tide-move-left", title: "Move the window left", key: "Meta+Shift+Left", action: "moveSide", arg: -1 },
   { name: "tide-move-right", title: "Move the window right", key: "Meta+Shift+Right", action: "moveSide", arg: 1 },
+  { name: "tide-focus-above", title: "Focus the window above", key: "Meta+Up", action: "focusVertical", arg: -1 },
+  { name: "tide-focus-below", title: "Focus the window below", key: "Meta+Down", action: "focusVertical", arg: 1 },
+  { name: "tide-move-above", title: "Move the window up", key: "Meta+Shift+Up", action: "moveVertical", arg: -1 },
+  { name: "tide-move-below", title: "Move the window down", key: "Meta+Shift+Down", action: "moveVertical", arg: 1 },
   { name: "tide-zoom", title: "Make the window the master", key: "Alt+Tab", action: "zoom" },
   { name: "tide-grow", title: "Grow the master", key: "Meta+\\", action: "mfact", arg: 1 },
   { name: "tide-shrink", title: "Shrink the master", key: "Meta+/", action: "mfact", arg: -1 },
@@ -48,9 +52,10 @@ export const KEYS = [
   { name: "tide-monocle-backtick", title: "Toggle monocle (backtick)", key: "Meta+`", action: "monocle" },
   { name: "tide-close", title: "Close the window", key: "Meta+Backspace", action: "close" },
   { name: "tide-minimize", title: "Minimize the window", key: "Meta+Z", action: "minimize" },
-  { name: "tide-maximize", title: "Maximize the window", key: "Meta+Up", action: "maximize" },
-  { name: "tide-fullscreen", title: "Make the window fullscreen", key: "Meta+Shift+Up", action: "fullscreen" },
-  { name: "tide-restore", title: "Restore the window", key: "Meta+Down", action: "restore" },
+  { name: "tide-maximize", title: "Toggle maximize", key: "Meta+X", action: "maximize" },
+  { name: "tide-fullscreen", title: "Toggle fullscreen", key: "Meta+Shift+X", action: "fullscreen" },
+  // No key, as in tide: undoes either
+  { name: "tide-restore", title: "Restore the window", key: "", action: "restore" },
   { name: "tide-float", title: "Toggle floating", key: "Meta+Shift+F", action: "toggleFloat" },
   { name: "tide-float-insert", title: "Toggle floating (Insert)", key: "Meta+Ins", action: "toggleFloat" },
   { name: "tide-home", title: "Go to home", key: "Meta+Home", action: "goHome" },

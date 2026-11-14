@@ -139,8 +139,8 @@ Status: **yes**, **partial**, **no**, or **differs** (done another way).
 
 | Feature | Status | How |
 |---|---|---|
-| tide's window and workspace keys | yes | `registerShortcut`, under `Meta` |
-| A key Plasma already has | yes | KGlobalAccel gives the key to both, and a press reaches one of them. `make setup` (`scripts/setup.mjs`) takes Plasma's off it in `kglobalshortcutsrc`, keeping their other keys, and binds tide's; KGlobalAccel reads them as the session starts |
+| tide's window and workspace keys | yes | `registerShortcut`, under `Meta`, as tide for Linux binds them under `Super`. Plasma binds none of `Meta+X`, `Meta+Shift+X`, `Meta+Shift+Up` or `Meta+Shift+Down` (KWin's, plasma-workspace's and plasma-desktop's source) |
+| A key Plasma already has | yes | KGlobalAccel gives the key to both, and a press goes to the shortcut made first, Plasma's (kglobalacceld's `GlobalShortcutsRegistry::activeShortcutByKey`). `make setup` (`scripts/setup.mjs`) takes Plasma's off it in `kglobalshortcutsrc`, keeping their other keys, and binds tide's; KGlobalAccel reads them as the session starts |
 | `keep_open`: an app's close key doesn't close it | no | A script can't take an app's own keys, or veto a close (§2) |
 
 ### 4.6 Launcher (tide §8)

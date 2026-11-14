@@ -118,6 +118,11 @@ test("a maximized or fullscreen window leaves the layout", () => {
   env.press("tide-maximize");
   assert.equal(b.maximizeMode, 3);
   assert.deepEqual(box(a), [0, 0, 1920, 1080]);
+  // Pressed again, it toggles back, as tide's Super+X does
+  env.press("tide-maximize");
+  assert.equal(b.maximizeMode, 0);
+  assert.deepEqual(box(a), [0, 0, 1056, 1080]);
+  env.press("tide-maximize");
   env.press("tide-restore");
   assert.equal(b.maximizeMode, 0);
   assert.deepEqual(box(a), [0, 0, 1056, 1080]);
@@ -331,6 +336,81 @@ test("right from an empty monitor's edge focuses the next monitor", () => {
   const { ws, env } = start(pairOfMonitors());
   ws.activeWindow = null;
   env.press("tide-focus-right");
+  assert.equal(ws.activeScreen.name, "B");
+});
+
+function stackedMonitors() {
+  return {
+    outputs: [
+      { name: "A", x: 0, y: 0, width: 1920, height: 1080 },
+      { name: "B", x: 0, y: 1080, width: 1920, height: 1080 },
+    ],
+  };
+}
+
+test("maximize, fullscreen and the arrows have tide's keys", () => {
+  const keyOf = (name) => KEYS.find((k) => k.name === name).key;
+  assert.deepEqual(
+    ["tide-maximize", "tide-fullscreen", "tide-restore", "tide-focus-above", "tide-focus-below", "tide-move-above", "tide-move-below"].map(keyOf),
+    ["Meta+X", "Meta+Shift+X", "", "Meta+Up", "Meta+Down", "Meta+Shift+Up", "Meta+Shift+Down"],
+  );
+});
+
+test("up and down focus along the stack, then the monitor below, not the stack from the master", () => {
+  const { ws, env } = start(stackedMonitors());
+  const a1 = ws.open();
+  const a2 = ws.open();
+  const a3 = ws.open();
+  ws.activeScreen = ws.screens[1];
+  const b1 = ws.open();
+  ws.activeWindow = a2;
+  env.press("tide-focus-below");
+  assert.equal(ws.activeWindow, a3);
+  env.press("tide-focus-below");
+  assert.equal(ws.activeWindow, b1);
+  // Up from B: the window at A's bottom edge sharing the most width
+  env.press("tide-focus-above");
+  assert.equal(ws.activeWindow, a1);
+  env.press("tide-focus-above");
+  assert.equal(ws.activeWindow, a1, "nothing above the top monitor");
+  env.press("tide-focus-below");
+  assert.equal(ws.activeWindow, b1, "from the master, down is the monitor below");
+});
+
+test("moving down swaps along the stack, then lands on the monitor below's top edge", () => {
+  const { ws, env } = start(stackedMonitors());
+  const a1 = ws.open();
+  const a2 = ws.open();
+  const a3 = ws.open();
+  ws.activeScreen = ws.screens[1];
+  const b1 = ws.open();
+  ws.activeWindow = a2;
+  env.press("tide-move-below");
+  assert.deepEqual([box(a1), box(a3), box(a2)], [[0, 0, 1056, 1080], [1056, 0, 864, 540], [1056, 540, 864, 540]]);
+  env.press("tide-move-below");
+  assert.equal(a2.output.name, "B");
+  // Of B's places, the master and the stack both touch its top edge; the
+  // stack shares more width with where a2 was
+  assert.deepEqual([box(b1), box(a2)], [[0, 1080, 1056, 1080], [1056, 1080, 864, 1080]]);
+  env.press("tide-move-above");
+  assert.equal(a2.output.name, "A");
+});
+
+test("a floating window moves to the same spot on the monitor below", () => {
+  const { ws, env } = start(stackedMonitors());
+  ws.open();
+  const f = ws.open();
+  env.press("tide-float");
+  f.frameGeometry = { x: 96, y: 54, width: 400, height: 300 };
+  env.press("tide-move-below");
+  assert.equal(f.output.name, "B");
+  assert.deepEqual(box(f), [96, 1134, 400, 300]);
+});
+
+test("down from an empty monitor's edge focuses the monitor below", () => {
+  const { ws, env } = start(stackedMonitors());
+  ws.activeWindow = null;
+  env.press("tide-focus-below");
   assert.equal(ws.activeScreen.name, "B");
 });
 

@@ -44,3 +44,8 @@
   home's name.
 - Settings live in kwinrc, as a KWin script can't read tide's
   `layouts.json`.
+- Maximize and fullscreen are `Meta+X` and `Meta+Shift+X`, and
+  `Meta+Up` and `Meta+Down` focus up and down, with `Meta+Shift` moving,
+  as tide for Linux's keys are. They were `Meta+Up`, `Meta+Shift+Up` and
+  `Meta+Down` (restore), copied from tide for Chrome, where chromeOS
+  forces them; KWin doesn't. Restore has no key, as in tide.

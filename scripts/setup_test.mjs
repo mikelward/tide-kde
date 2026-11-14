@@ -65,6 +65,18 @@ test("tide's keys are bound, but one you bound yourself stays", () => {
   assert.equal(bound.length, KEYS.filter((k) => k.key).length - 1);
 });
 
+test("a key on its default from before tide's moves to tide's, but one you changed stays", () => {
+  const w = writes({
+    "kglobalshortcutsrc kwin tide-maximize": "Meta+Up,none,tide: Maximize the window",
+    "kglobalshortcutsrc kwin tide-restore": "Meta+Down,none,tide: Restore the window",
+    "kglobalshortcutsrc kwin tide-fullscreen": "Meta+F,none,tide: Make the window fullscreen",
+  });
+  assert.equal(w.get("kglobalshortcutsrc kwin tide-maximize"), "Meta+X,Meta+X,tide: Toggle maximize");
+  assert.equal(w.get("kglobalshortcutsrc kwin tide-restore"), "none,none,tide: Restore the window");
+  assert.ok(!w.has("kglobalshortcutsrc kwin tide-fullscreen"));
+  assert.equal(w.get("kglobalshortcutsrc kwin tide-focus-above"), "Meta+Up,Meta+Up,tide: Focus the window above");
+});
+
 test("the dim and focus settings are written, but not what's set already", () => {
   const w = writes();
   assert.equal(w.get("kwinrc Effect-diminactive DimByGroup"), "false");
@@ -111,6 +123,17 @@ test("the batch has the shortcuts set by an earlier run too", () => {
   assert.match(lines, /^kwin\tWalk Through Windows\tnone\tWalk Through Windows$/m);
   assert.match(lines, /^kwin\ttide-zoom\tAlt\+Tab\ttide: /m);
   assert.match(lines, /^kwin\ttide-go-1\tMeta\+F1\ttide: Go to workspace 1$/m);
+});
+
+test("the batch releases a key a former default held, so the session lets it go now", () => {
+  const before = { ...PLASMA, "kglobalshortcutsrc kwin tide-restore": "Meta+Down,none,tide: Restore the window" };
+  const config = { ...before };
+  for (const w of plan((file, group, key) => before[`${file} ${group} ${key}`] ?? null)) {
+    config[`${w.file} ${w.group} ${w.key}`] = w.value;
+  }
+  const lines = batchLines(shortcutEntries((file, group, key) => config[`${file} ${group} ${key}`] ?? null));
+  assert.match(lines, /^kwin\ttide-restore\tnone\ttide: Restore the window$/m);
+  assert.match(lines, /^kwin\ttide-focus-below\tMeta\+Down\ttide: /m);
 });
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));

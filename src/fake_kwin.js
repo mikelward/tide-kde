@@ -172,6 +172,17 @@ export class FakeWorkspace {
   slotSwitchToLeftScreen() {
     this.activeScreen = this.screens[Math.max(this.screens.indexOf(this.activeScreen) - 1, 0)];
   }
+  // The nearest screen wholly above or below the active one, if any.
+  slotSwitchToAboveScreen() {
+    const g = this.activeScreen.geometry;
+    const above = this.screens.filter((o) => o.geometry.y + o.geometry.height <= g.y);
+    if (above.length) this.activeScreen = above.reduce((a, b) => (b.geometry.y > a.geometry.y ? b : a));
+  }
+  slotSwitchToBelowScreen() {
+    const g = this.activeScreen.geometry;
+    const below = this.screens.filter((o) => o.geometry.y >= g.y + g.height);
+    if (below.length) this.activeScreen = below.reduce((a, b) => (b.geometry.y < a.geometry.y ? b : a));
+  }
   open(props = {}) {
     const w = new FakeWindow(this, props);
     this.windows.push(w);

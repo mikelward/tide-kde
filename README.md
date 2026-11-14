@@ -62,8 +62,8 @@ can change them.
 |---|---|
 | `Meta+J` / `Meta+K` | focus the next / previous window in the stack |
 | `Meta+Shift+J` / `Meta+Shift+K` | move the window down / up the stack |
-| `Meta+Left` / `Meta+Right` | focus the window that way; at a monitor's edge, the nearest on the next monitor |
-| `Meta+Shift+Left` / `Meta+Shift+Right` | move the window that way: swap on the monitor, or onto the next one, landing at the edge it came in by |
+| `Meta+Left` / `Right` / `Up` / `Down` | focus the window that way; at a monitor's edge, the nearest on the next monitor |
+| `Meta+Shift+Left` / `Right` / `Up` / `Down` | move the window that way: swap on the monitor, or onto the next one, landing at the edge it came in by |
 | `Alt+Tab` | make the window the master; on the master, swap with the one before |
 | `Meta+\` / `Meta+/` | grow / shrink the master |
 | `Meta+=` / `Meta+-` | add / remove a master |
@@ -71,7 +71,7 @@ can change them.
 | `Meta+O`, ``Meta+` `` | toggle monocle |
 | `Meta+Backspace` | close the window |
 | `Meta+Z` | minimize the window |
-| `Meta+Up` / `Meta+Shift+Up` / `Meta+Down` | maximize / fullscreen / restore |
+| `Meta+X` / `Meta+Shift+X` | toggle maximize / fullscreen |
 | `Meta+Shift+F`, `Meta+Ins` | toggle floating |
 | `Meta+1…9` / `Meta+0` | go to the Nth / last workspace |
 | `Meta+Shift+1…9` / `Meta+Shift+0` | send the window to the Nth / last workspace |
@@ -89,6 +89,11 @@ screen), `Meta+PgUp` and `Meta+PgDown` (maximize and minimize),
 `Meta+Backspace` (restore), `Meta+0`, `Meta+=` and `Meta+-` (zoom) and
 `Meta+.` (emoji). `make setup` frees them, and tide's take over at the
 next login.
+
+Maximize and fullscreen were `Meta+Up` and `Meta+Shift+Up`, with restore
+on `Meta+Down`. They're now tide for Linux's keys, so the arrows move
+focus up and down as they do there, and restore has no key. `make setup`
+moves a key still on its old default.
 
 ## Setup
 
