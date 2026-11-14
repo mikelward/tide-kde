@@ -4,14 +4,14 @@
 #   make lint         every script parses
 #   make test         the unit tests (Node)
 #   make test-kwin    the script in a headless KWin (tests/kwin/); needs
-#                     kwin_wayland, foot, qdbus6 and dbus-run-session
+#                     what README.md's Development lists
 #   make check-tideco compare the copied geometry with a tide for Chrome
 #                     checkout (TIDECO=../tideco by default)
 #   make dist         dist/tide.kwinscript, for KWin's "Install from File",
 #                     and dist/tide-layout.plasmoid, the layout widget
 #   make install      install both for this user, turn the script on, and
 #                     have KWin load it; `make uninstall` takes them out
-#   make setup        free Plasma's keys that tide's take, set the dim and
+#   make setup        free Plasma's keys that tide's take, set dimming and
 #                     focus stealing prevention, and put the layout widget
 #                     on the panel (scripts/setup.mjs)
 

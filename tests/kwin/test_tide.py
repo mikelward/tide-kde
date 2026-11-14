@@ -208,11 +208,11 @@ class DimTest(KWinTest):
         mark = self.log.mark()
         self.open("one")
         self.open("two")
-        self.log.wait(lambda l: "tide: dim on" in l, "the dim went on", since=mark)
+        self.log.wait(lambda l: "tide: dim on" in l, "dimming went on", since=mark)
         self.assertEqual(self.dim(), "true")
         mark = self.log.mark()
         self.key("tide-minimize")
-        self.log.wait(lambda l: "tide: dim off" in l, "the dim went off", since=mark)
+        self.log.wait(lambda l: "tide: dim off" in l, "dimming went off", since=mark)
         self.assertEqual(self.dim(), "false")
 
 

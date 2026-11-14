@@ -77,7 +77,7 @@ test("a key on its default from before tide's moves to tide's, but one you chang
   assert.equal(w.get("kglobalshortcutsrc kwin tide-focus-above"), "Meta+Up,Meta+Up,tide: Focus the window above");
 });
 
-test("the dim and focus settings are written, but not what's set already", () => {
+test("the dimming and focus settings are written, but not what's set already", () => {
   const w = writes();
   assert.equal(w.get("kwinrc Effect-diminactive DimByGroup"), "false");
   assert.equal(w.get("kwinrc Windows FocusStealingPreventionLevel"), "2");

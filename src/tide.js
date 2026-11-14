@@ -241,7 +241,7 @@ export class Tide {
     }
     if (was !== undefined && was !== key) this.relayout(was);
     if (key !== null) this.relayout(key);
-    // A window on every desktop has no part to relayout, but counts for the dim
+    // A window on every desktop has no part to relayout, but counts for dimming
     else this.updateDim();
   }
 
@@ -392,7 +392,7 @@ export class Tide {
     this.announce();
   }
 
-  // --- The dim (SPEC.md §4.2) ---------------------------------------------
+  // --- Dimming inactive windows (SPEC.md §4.2) ---------------------------
 
   // KWin's Dim Inactive dims every inactive window, so tide has it on only
   // while some monitor shows two windows or more: with one apiece there's
@@ -420,7 +420,7 @@ export class Tide {
         else this.log(`dim ${want ? "on" : "off"}`);
       });
     } catch (e) {
-      this.log(`couldn't ${want ? "turn on" : "turn off"} Dim Inactive (${e}), so the dim may be wrong`);
+      this.log(`couldn't ${want ? "turn on" : "turn off"} Dim Inactive (${e}), so dimming may be wrong`);
       this.dimLoaded = null;
     }
   }

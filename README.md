@@ -14,15 +14,16 @@ launcher on Plasma, with its Workspaces and Windows tabs, from tide
 - **Layouts.** Each monitor's part of a desktop tiles in tide's layouts:
   tile (master left at 55%), three columns (the default at an aspect of 2.1
   or wider), two columns plus a stack, and monocle. A lone window is 80%
-  wide, centered, on an ultrawide and 60% at 32:9.
+  wide, centered, on an ultrawide, and 60% from an aspect of 3.2.
 - **Mouse.** Drag a tiled window onto another to swap them. Drag the edge
   between the master and the stack to set the split, or a lone window's
   edge to set its width.
 - **Floating.** Dialogs, windows of a fixed size and windows on every
   desktop float, as do those you float with the key.
-- **The dim.** Plasma's Dim Inactive effect dims every window but the
-  active one, and tide has it on only while a monitor shows two windows or
-  more. Its strength is Plasma's setting, under Desktop Effects.
+- **Dimming inactive windows.** Plasma's Dim Inactive effect dims every
+  window but the active one, and tide has it on only while a monitor shows
+  two windows or more. Its strength is Plasma's setting, under Desktop
+  Effects.
 - **The layout widget**, "tide Layout" in Add Widgets, shows the layout
   of the workspace on its panel's monitor as tide's bar does: `[]=`,
   `|M|`, `||=`, or `[n]` in monocle with n windows hidden. A click is the
@@ -77,7 +78,7 @@ can change them.
 | `Meta+Shift+1…9` / `Meta+Shift+0` | send the window to the Nth / last workspace |
 | `Meta+Home` | go to home |
 | `Meta+Tab` | flip between home and the last workspace |
-| `Meta+End` | flip between the last two workspaces other than home |
+| `Meta+End` | go to the last workspace other than home; again, the one before it, so presses flip between two |
 | `Meta+PgUp` / `Meta+PgDown` | previous / next workspace with a window |
 | `Meta+Shift+PgUp` / `Meta+Shift+PgDown` | move the window to the previous / next workspace |
 
@@ -112,10 +113,11 @@ After `make install`, this sets Plasma up as tide has it:
 - puts the layout widget on the first panel;
 - gives the lock screen the desktop's wallpaper, as it is then.
 
-`node scripts/setup.mjs --dry-run` says what it would change. Plasma reads
-its shortcuts as the session starts; `--batch FILE` also adds them to FILE
-for scripts' `kdeshortcut.py` (mikelward/scripts), which applies them to
-the running session, as its `setup-kde` does.
+`make uninstall` leaves these as they are, and there's no undo for them
+yet (TODO.md). `node scripts/setup.mjs --dry-run` says what it would
+change. Plasma reads its shortcuts as the session starts; `--batch FILE`
+also adds them to FILE for scripts' `kdeshortcut.py` (mikelward/scripts),
+which applies them to the running session, as its `setup-kde` does.
 
 ## Settings
 
@@ -149,12 +151,13 @@ tide's face on it needs a change to Plasma (SPEC.md §4.7).
     make test-kwin        # the script in a headless KWin
     make check-tideco     # the geometry is tide for Chrome's, unchanged
 
-`make test-kwin` also runs the layout widget in a real plasmashell when
-there's one (Ubuntu's `plasma-desktop`), as CI's `plasma` job does.
-`make test-kwin` needs `kwin_wayland`, KWin's package structures (Debian's and Ubuntu's `kwin-common`), `kpackagetool6`, `foot`, `qdbus6`
-and `dbus-run-session`; CI runs it on Ubuntu's devel release. KWin's
-script engine lacks some of what Node runs, which `scripts/bundle.mjs`
-refuses (SPEC.md §2).
+`make test-kwin` needs `kwin_wayland`, KWin's package structures
+(Debian's and Ubuntu's `kwin-common`), `kpackagetool6`, `kreadconfig6`
+and `kwriteconfig6`, `foot`, `qdbus6`, `dbus-run-session`, Python 3 and
+Node; CI runs it on Ubuntu's devel release. It also runs the layout
+widget in a real plasmashell when there's one (Ubuntu's
+`plasma-desktop`), as CI's `plasma` job does. KWin's script engine lacks
+some of what Node runs, which `scripts/bundle.mjs` refuses (SPEC.md §2).
 
 ## License
 
