@@ -123,18 +123,15 @@ class UltrawideTest(KWinTest):
 
 
 class WorkspaceTest(KWinTest):
-    def test_the_first_desktop_is_home(self):
-        self.assertEqual(self.state()["desktops"], ["in"])
+    def test_every_standing_workspace_is_made_at_start(self):
+        self.assertEqual(self.state()["desktops"], ["in", "re", "oc", "me"])
 
-    def test_going_to_a_standing_workspace_makes_it_in_its_place(self):
+    def test_standing_workspaces_stay_empty(self):
         s = self.key("tide-go-3")
-        self.assertEqual((s["desktops"], s["current"]), (["in", "oc"], "oc"))
-        s = self.key("tide-go-2")
-        self.assertEqual((s["desktops"], s["current"]), (["in", "re", "oc"], "re"))
+        self.assertEqual(s["current"], "oc")
         s = self.key("tide-home")
         self.assertEqual(s["current"], "in")
-        # Standing ones stay, empty
-        self.assertEqual(s["desktops"], ["in", "re", "oc"])
+        self.assertEqual(s["desktops"], ["in", "re", "oc", "me"])
 
     def test_sending_a_window_leaves_you_where_you_are(self):
         self.open("one")
@@ -158,7 +155,7 @@ class WorkspaceTest(KWinTest):
         s = self.key("tide-go-0")
         self.assertEqual(s["current"], "scratch")
         s = self.key("tide-home")
-        self.assertEqual(s["desktops"], ["in"])
+        self.assertEqual(s["desktops"], ["in", "re", "oc", "me"])
 
     def test_next_workspace_passes_over_empty_ones(self):
         self.key("tide-go-2")

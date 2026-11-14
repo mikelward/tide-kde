@@ -158,10 +158,12 @@ test("the keys act on the active monitor's part with no window", () => {
   assert.deepEqual(box(a), [0, 0, 960, 1080]);
 });
 
-test("home is the first desktop, and a desktop already named home stays", () => {
-  assert.deepEqual(start().ws.desktops.map((d) => d.name), ["in"]);
-  const { ws } = start({ desktops: ["web", "IN"] });
-  assert.deepEqual(ws.desktops.map((d) => d.name), ["web", "IN"]);
+test("every standing workspace is made at start, home from the first desktop", () => {
+  assert.deepEqual(start().ws.desktops.map((d) => d.name), ["in", "re", "oc", "me"]);
+  // One named already stays where it is, and the rest go after it in order
+  const { ws } = start({ desktops: ["web", "IN", "oc"] });
+  assert.deepEqual(ws.desktops.map((d) => d.name), ["web", "IN", "re", "oc", "me"]);
+  assert.deepEqual(start({}, { standing: "home, work" }).ws.desktops.map((d) => d.name), ["home", "work"]);
 });
 
 test("Super+End toggles between the last two workspaces other than home", () => {
@@ -179,11 +181,11 @@ test("Super+End toggles between the last two workspaces other than home", () => 
 
 test("a made desktop with a window stays when left", () => {
   const { ws, env } = start();
-  ws.createDesktop(1, "work");
+  ws.createDesktop(ws.desktops.length, "work");
   env.press("tide-go-0");
   ws.open();
   env.press("tide-home");
-  assert.deepEqual(ws.desktops.map((d) => d.name), ["in", "work"]);
+  assert.deepEqual(ws.desktops.map((d) => d.name), ["in", "re", "oc", "me", "work"]);
 });
 
 test("a bad setting is a notification naming it", () => {
@@ -227,11 +229,11 @@ test("a key that fails is logged, and the rest go on", () => {
 
 test("a desktop with only a fixed-size window isn't empty", () => {
   const { ws, env } = start();
-  ws.createDesktop(1, "work");
+  ws.createDesktop(ws.desktops.length, "work");
   env.press("tide-go-0");
   ws.open({ minSize: { width: 300, height: 200 }, maxSize: { width: 300, height: 200 } });
   env.press("tide-home");
-  assert.deepEqual(ws.desktops.map((d) => d.name), ["in", "work"]);
+  assert.deepEqual(ws.desktops.map((d) => d.name), ["in", "re", "oc", "me", "work"]);
 });
 
 test("single set empty makes a lone window fill an ultrawide", () => {

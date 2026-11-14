@@ -49,6 +49,11 @@ test("a new standing desktop goes after the standing ones before it", () => {
   assert.equal(ws.position(v, "new"), 3);
 });
 
+test("the standing names missing are the ones no desktop has, in order", () => {
+  assert.deepEqual(ws.missing(view(["IN", "web", "oc"])), ["re", "me"]);
+  assert.deepEqual(ws.missing(view(["in", "re", "oc", "me"])), []);
+});
+
 test("stepping passes over empty workspaces and wraps", () => {
   const v = view(["in", "re", "oc", "web"], { current: "web", windows: { re: 1 } });
   assert.equal(ws.step(v, 1, { withWindows: true }).name, "re");

@@ -28,10 +28,9 @@ launcher on Plasma, with its Workspaces and Windows tabs, from tide
   `|M|`, `||=`, or `[n]` in monocle with n windows hidden. A click is the
   next layout.
 - **Workspaces** are Plasma's virtual desktops, which span every monitor.
-  The first is home, `in` by default, named so at start. The other standing
-  ones, `re`, `oc` and `me`, are made the first time you go there or send a
-  window there, in their order. Any other desktop goes once you leave it
-  empty.
+  The standing ones, `in`, `re`, `oc` and `me` by default, are made at
+  start, in their order, and stay. The first is home, and takes the first
+  desktop's name. Any other desktop goes once you leave it empty.
 
 ## Install
 

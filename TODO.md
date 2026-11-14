@@ -9,7 +9,7 @@
    and tiling each desktop's windows per output as they come, go, move and
    resize, with drags (SPEC.md §4.1).
 3. **Done:** keys through `registerShortcut` (README.md).
-4. **Done:** workspaces: home, the standing ones made on demand, made ones
+4. **Done:** workspaces: every standing one made at start, made ones
    removed when left empty, and their keys (SPEC.md §4.3).
 5. **Done:** `Meta+Left` and `Meta+Right`: focus and move by side, across
    monitors, as tide's `direction.lua`.
@@ -37,9 +37,9 @@
 
 - The script's ID is `tide`, so its settings are kwinrc's `[Script-tide]`
   and it's `tideEnabled` under `[Plugins]`.
-- Standing workspaces stay once made, even empty, so Plasma's Pager, the
-  bar for now, always lists them. tide's Hyprland removes an empty one and
-  its bar lists it anyway.
+- Standing workspaces are made at start and stay, even empty, so Plasma's
+  Pager, the bar for now, always lists them. tide for Linux makes them on
+  demand and removes an empty one, and its bar lists it anyway.
 - Home is the first desktop, renamed `in` at start when no desktop has
   home's name.
 - Settings live in kwinrc, as a KWin script can't read tide's
