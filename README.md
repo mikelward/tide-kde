@@ -149,7 +149,8 @@ tide's face on it needs a change to Plasma (SPEC.md §4.7).
 
     make lint test        # Node: the layouts, workspaces and settings, and tide.js on a fake KWin
     make test-kwin        # the script in a headless KWin
-    make check-tideco     # the geometry is tide for Chrome's, unchanged
+    make check-tideco     # the geometry and defaults check are tide for Chrome's, unchanged
+    make check-tide-defaults  # the layout defaults and standing workspaces are tide's
 
 `make test-kwin` needs `kwin_wayland`, KWin's package structures
 (Debian's and Ubuntu's `kwin-common`), `kpackagetool6`, `kreadconfig6`

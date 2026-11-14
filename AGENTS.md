@@ -122,6 +122,7 @@ Shared by every mikelward repo and the user-level agent config; canonical in mik
   the rest *(unverified)*, as `SPEC.md` does.
 - **Tests**. `make lint test` (Node) and `make test-kwin` (a headless `kwin_wayland`,
   `tests/kwin/`); every `*_test.js` must be listed in the `Makefile`. `make
-  check-tideco` compares the copied geometry with tide for Chrome's.
+  check-tideco` compares the copied geometry with tide for Chrome's, and `make
+  check-tide-defaults` the defaults that restate tide's with a tide checkout.
 - **KWin**. Only a headless one runs here, in a container from `ubuntu:devel` (CI's
   `kwin` job says how). Say what only the fake KWin (`src/fake_kwin.js`) tested.

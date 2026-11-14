@@ -5,8 +5,10 @@
 #   make test         the unit tests (Node)
 #   make test-kwin    the script in a headless KWin (tests/kwin/); needs
 #                     what README.md's Development lists
-#   make check-tideco compare the copied geometry with a tide for Chrome
-#                     checkout (TIDECO=../tideco by default)
+#   make check-tideco compare the copied geometry and defaults check with
+#                     a tide for Chrome checkout (TIDECO=../tideco by default)
+#   make check-tide-defaults  compare the defaults that restate tide's with
+#                     a tide checkout (TIDE=../tide by default)
 #   make dist         dist/tide.kwinscript, for KWin's "Install from File",
 #                     and dist/tide-layout.plasmoid, the layout widget
 #   make install      install both for this user, turn the script on, and
@@ -16,6 +18,7 @@
 #                     on the panel (scripts/setup.mjs)
 
 TIDECO ?= ../tideco
+TIDE ?= ../tide
 SCRIPT = package/contents/code/main.js
 SRC = $(filter-out %_test.js src/fake_kwin.js,$(wildcard src/*.js))
 
@@ -30,9 +33,10 @@ TESTS = \
 	src/workspaces_test.js \
 	scripts/bundle_test.mjs \
 	scripts/install_test.mjs \
-	scripts/setup_test.mjs
+	scripts/setup_test.mjs \
+	scripts/tidedefaults_test.mjs
 
-.PHONY: all lint test test-kwin check-tideco dist install uninstall setup version unshallow-check clean
+.PHONY: all lint test test-kwin check-tideco check-tide-defaults dist install uninstall setup version unshallow-check clean
 
 all: $(SCRIPT)
 
@@ -56,6 +60,14 @@ test-kwin: $(SCRIPT)
 check-tideco:
 	cmp $(TIDECO)/src/geometry.js src/geometry.js
 	cmp $(TIDECO)/src/geometry_test.js src/geometry_test.js
+	cmp $(TIDECO)/scripts/tidedefaults.mjs scripts/tidedefaults.mjs
+	cmp $(TIDECO)/scripts/tidedefaults_test.mjs scripts/tidedefaults_test.mjs
+
+# The defaults tide on KDE restates (the layouts, the main share's bounds,
+# the standing workspaces) are still tide's. Deliberate differences are
+# listed in the script.
+check-tide-defaults:
+	node scripts/check-tide-defaults.mjs $(TIDE)
 
 # The version is the number of commits, so each push to main is a higher
 # one, released by CI as v<version>.
