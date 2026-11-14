@@ -69,6 +69,25 @@ class TileTest(KWinTest):
         s = self.key("tide-focus-up")
         self.assertTrue(s["windows"]["three"]["active"], s)
 
+    def test_up_and_down_focus_along_the_stack(self):
+        self.three()
+        s = self.settled({"three": (1056, 540, 864, 540)})
+        self.assertTrue(s["windows"]["three"]["active"])
+        s = self.key("tide-focus-above")
+        self.assertTrue(s["windows"]["two"]["active"], s)
+        s = self.key("tide-focus-below")
+        self.assertTrue(s["windows"]["three"]["active"], s)
+
+    def test_maximize_toggles(self):
+        self.open("one")
+        self.open("two")
+        self.settled({"one": (0, 0, 1056, 1080), "two": (1056, 0, 864, 1080)})
+        whole = (0, 0, 1920, 1080)
+        self.key("tide-maximize")
+        self.settled({"one": whole, "two": whole})
+        self.key("tide-maximize")
+        self.settled({"one": (0, 0, 1056, 1080), "two": (1056, 0, 864, 1080)})
+
     def test_zoom_makes_the_window_the_master_and_back(self):
         self.three()
         self.settled({"one": (0, 0, 1056, 1080)})

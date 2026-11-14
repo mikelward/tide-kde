@@ -40,6 +40,28 @@ test("past the last monitor, nothing", () => {
   assert.equal(direction.find(m[0].tiles[0].box, "A", m, -1), null);
 });
 
+test("up and down are the same rule on turned boxes", () => {
+  // A over B: A in tile, B with one window.
+  const m = direction.turned([
+    { name: "A", area: box(0, 34, 1920, 1046), box: box(0, 0, 1920, 1080), tiles: [tile("a1", 0, 0, 1056, 1080), tile("a2", 1056, 0, 864, 540), tile("a3", 1056, 540, 864, 540)] },
+    { name: "B", box: box(0, 1080, 1920, 1080), tiles: [tile("b1", 0, 1080, 1920, 1080)] },
+  ]);
+  assert.equal(m[0].area.y, 34, "the area is kept as it was");
+  assert.equal(m[0].tiles[1].address, "a2", "other fields are kept");
+  const turned = direction.turn;
+  let r = direction.find(turned(box(1056, 0, 864, 540)), "A", m, 1);
+  assert.equal(r.tile.address, "a3", "below the stack's top is its bottom");
+  assert.equal(r.monitor.name, "A", "on the same monitor");
+  r = direction.find(turned(box(1056, 540, 864, 540)), "A", m, -1);
+  assert.equal(r.tile.address, "a2", "and back up");
+  r = direction.find(turned(box(1056, 540, 864, 540)), "A", m, 1);
+  assert.equal(r.monitor.name, "B", "past the bottom, the monitor below");
+  assert.equal(r.tile.address, "b1", "its window");
+  r = direction.find(turned(box(0, 1080, 1920, 1080)), "B", m, -1);
+  assert.equal(r.tile.address, "a1", "up from B, the window sharing the most width at A's bottom edge");
+  assert.equal(direction.find(turned(box(0, 0, 1056, 1080)), "A", m, -1), null, "nothing above the top monitor, not the stack");
+});
+
 test("a monitor that way with no windows is picked with no window", () => {
   const m = pair();
   m[1].tiles = [];

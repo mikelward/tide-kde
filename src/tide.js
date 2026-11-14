@@ -307,14 +307,15 @@ export class Tide {
   }
 
   // Puts `w`, just moved into part `key` going `d` from box `from`, in the
-  // place nearest the edge it came in by (tide SPEC.md §6.6).
-  land(w, key, { d, from }) {
+  // place nearest the edge it came in by (tide SPEC.md §6.6). Going up or
+  // down, `from` is turned, and so are the places.
+  land(w, key, { d, from, vertical }) {
     const part = this.parts.get(key);
     const id = idOf(w);
     const ids = this.tiledIn(key).map(idOf);
     const area = this.area(this.outputOf(key), this.desktopOf(key));
     const slots = geometry.arrange(part.mode, area, ids.length, part.opts[part.mode], layout.singleRules(part, this.config));
-    const at = direction.landing(slots, d, from);
+    const at = direction.landing(vertical ? slots.map(direction.turn) : slots, d, from);
     const others = ids.filter((x) => x !== id);
     layout.remove(part, id);
     const before = at === null ? undefined : others[at];
@@ -555,9 +556,10 @@ export class Tide {
     if (w && w.minimizable) w.minimized = true;
   }
 
+  // Meta+X toggles maximize, as tide's Super+X does.
   maximize() {
     const w = this.active();
-    if (w && w.maximizable) w.setMaximize(true, true);
+    if (w && w.maximizable) w.setMaximize(!w.maximizeMode, !w.maximizeMode);
   }
 
   fullscreen() {
@@ -582,42 +584,61 @@ export class Tide {
     if (key !== null) this.relayout(key);
   }
 
-  // --- Left and right (tide SPEC.md §6.6) --------------------------------
+  // --- Left, right, up and down (tide SPEC.md §6.6) ----------------------
 
-  // Every monitor, with the current desktop's tiles on it, for direction.js.
-  monitors() {
+  // Every monitor, with the current desktop's tiles on it, for direction.js;
+  // turned for up and down. `area` is the monitor's own, never turned.
+  monitors(vertical = false) {
     const desktop = this.ws.currentDesktop;
     const byId = this.windowsById();
-    return this.ws.screens.map((o) => ({
-      name: o.name,
-      output: o,
-      box: this.area(o, desktop),
-      tiles: this.tiledIn(`${desktop.id}|${o.name}`, byId).map((w) => ({ box: box(w.frameGeometry), window: w })),
-    }));
+    const list = this.ws.screens.map((o) => {
+      const area = this.area(o, desktop);
+      return {
+        name: o.name,
+        output: o,
+        area,
+        box: area,
+        tiles: this.tiledIn(`${desktop.id}|${o.name}`, byId).map((w) => ({ box: box(w.frameGeometry), window: w })),
+      };
+    });
+    return vertical ? direction.turned(list) : list;
   }
 
-  // Meta+Left and Right: the window that way, or at a monitor's edge the
-  // nearest one on the next monitor, or that monitor itself if it has none.
-  focusSide(d) {
+  // Meta and an arrow (d -1 for left or up, 1 for right or down): the
+  // window that way, or at a monitor's edge the nearest one on the next
+  // monitor, or that monitor itself if it has none.
+  focusWay(d, vertical) {
     const w = this.active();
     const here = w && w.output ? w.output : this.ws.activeScreen;
     const from = w ? box(w.frameGeometry) : this.area(here, this.ws.currentDesktop);
-    const r = direction.find(from, here.name, this.monitors(), d);
+    const r = direction.find(vertical ? direction.turn(from) : from, here.name, this.monitors(vertical), d);
     if (!r) return;
     if (r.tile) this.ws.activeWindow = r.tile.window;
-    else if (d > 0) this.ws.slotSwitchToRightScreen();
+    else if (vertical) {
+      if (d > 0) this.ws.slotSwitchToBelowScreen();
+      else this.ws.slotSwitchToAboveScreen();
+    } else if (d > 0) this.ws.slotSwitchToRightScreen();
     else this.ws.slotSwitchToLeftScreen();
   }
 
-  // Meta+Shift+Left and Right: a tiled window swaps with the one that way,
+  focusSide(d) {
+    this.focusWay(d, false);
+  }
+
+  focusVertical(d) {
+    this.focusWay(d, true);
+  }
+
+  // Meta+Shift and an arrow: a tiled window swaps with the one that way,
   // or at the edge goes onto the next monitor, landing nearest the edge it
   // came in by; a floating one goes onto the next monitor at the same
   // relative spot.
-  moveSide(d) {
+  moveWay(d, vertical) {
     const w = this.active();
     if (!w || !w.output) return;
-    const monitors = this.monitors();
-    const from = box(w.frameGeometry);
+    const monitors = this.monitors(vertical);
+    const at = box(w.frameGeometry);
+    const from = vertical ? direction.turn(at) : at;
     if (this.tiled(w)) {
       const r = direction.find(from, w.output.name, monitors, d);
       if (!r) return;
@@ -627,7 +648,7 @@ export class Tide {
         this.relayout(key);
         return;
       }
-      this.landings.set(idOf(w), { d, from });
+      this.landings.set(idOf(w), { d, from, vertical });
       this.ws.sendClientToScreen(w, r.monitor.output);
       return;
     }
@@ -635,8 +656,16 @@ export class Tide {
     const next = cur ? direction.nextMonitor(cur, monitors, d) : null;
     if (!next) return;
     this.ws.sendClientToScreen(w, next.output);
-    const b = direction.place(from, cur.box, next.box);
+    const b = direction.place(at, cur.area, next.area);
     w.frameGeometry = { x: b.x, y: b.y, width: b.w, height: b.h };
+  }
+
+  moveSide(d) {
+    this.moveWay(d, false);
+  }
+
+  moveVertical(d) {
+    this.moveWay(d, true);
   }
 
   // --- Workspaces (SPEC.md §4.3) ----------------------------------------

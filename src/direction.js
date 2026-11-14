@@ -1,13 +1,37 @@
-// Left and right between windows and monitors (tide SPEC.md §6.6): which
-// window Meta+Left and Right select, where Meta+Shift+Left and Right move
-// the window, and where a moved window lands on the next monitor, tiled or
-// floating. Pure geometry on {x, y, w, h} boxes, free of KWin's API. A port
-// of tide's hypr/tide/direction.lua, whose tests these are.
+// Left, right, up and down between windows and monitors (tide SPEC.md
+// §6.6): which window Meta and an arrow selects, where Meta+Shift and an
+// arrow moves the window, and where a moved window lands on the next
+// monitor, tiled or floating. Pure geometry on {x, y, w, h} boxes, free of
+// KWin's API. A port of tide's hypr/tide/direction.lua, whose tests these
+// are.
 //
 // One rule picks both a window and a monitor: of the boxes on that side,
 // the one sharing the most height with where you are, then the one whose
 // center is nearest, then the first listed. "On that side" means its
-// center is left (d < 0) or right (d > 0) of yours.
+// center is left (d < 0) or right (d > 0) of yours. On your own monitor a
+// window must also share some height with you, so the stack is not above
+// the master in a layout with the master on the left.
+//
+// Up and down are the same rule on turned boxes (turned): x and y swap,
+// and so do w and h, so "left" is up and "height" is width.
+
+// `b` turned on its diagonal: x and y swap, and so do w and h.
+export function turn(b) {
+  return { x: b.y, y: b.x, w: b.h, h: b.w };
+}
+
+// `monitors`, as find takes them, with every box turned: each monitor's
+// own and its tiles'. The rule then goes up (d < 0) and down (d > 0).
+// Other fields, `area` among them, are kept as they are.
+export function turned(monitors) {
+  // Object.assign, as KWin's script engine has no object spread
+  return monitors.map((m) =>
+    Object.assign({}, m, {
+      box: turn(m.box),
+      tiles: (m.tiles ?? []).map((t) => Object.assign({}, t, { box: turn(t.box) })),
+    }),
+  );
+}
 
 function center(b) {
   return [b.x + b.w / 2, b.y + b.h / 2];
@@ -67,16 +91,16 @@ export function nextMonitor(cur, monitors, d) {
   return next ? next.monitor : null;
 }
 
-// Where Meta+Left or Right goes from `box` on monitor `here`. `monitors` is
+// Where Meta and an arrow goes from `box` on monitor `here`. `monitors` is
 // every monitor, each {name, box, tiles}, its tiles each {box, ...}, in
-// layout order. Returns {tile, monitor}: on this monitor if a tile is that
-// way; at its edge, on the next monitor that way, at the edge you come in
-// by and picked against `box` as well; tile null if that monitor has none;
-// null with no monitor that way.
+// layout order. Returns {tile, monitor}: on this monitor if a tile sharing
+// some height with `box` is that way; at its edge, on the next monitor that
+// way, at the edge you come in by and picked against `box` as well; tile
+// null if that monitor has none; null with no monitor that way.
 export function find(box, here, monitors, d) {
   const cur = monitors.find((m) => m.name === here);
   if (!cur) return null;
-  const hit = pick(box, cur.tiles, d);
+  const hit = pick(box, cur.tiles.filter((t) => overlap(box, t.box) > 0), d);
   if (hit) return { tile: hit, monitor: cur };
   const m = nextMonitor(cur, monitors, d);
   if (!m) return null;

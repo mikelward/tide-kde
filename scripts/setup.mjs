@@ -40,6 +40,15 @@ export const TAKEN = [
   ["org.kde.plasma.emojier.desktop", "_launch", ["Meta+."]],
 ];
 
+// tide's keys whose default was another key before they followed tide for
+// Linux's: name → the old default. One still on its old default moves to
+// the new one, or none; one you changed stays.
+export const FORMER = {
+  "tide-maximize": "Meta+Up",
+  "tide-fullscreen": "Meta+Shift+Up",
+  "tide-restore": "Meta+Down",
+};
+
 // kwinrc's settings for tide: Dim Inactive at the strength tide's KDE
 // setup had, on every inactive app window and nothing else (tide SPEC.md
 // §6.2), and KWin's focus stealing prevention at Medium (tide SPEC.md
@@ -122,15 +131,17 @@ export function plan(read) {
     }
   }
   for (const k of KEYS) {
-    if (!k.key) continue;
     const e = parseEntry(read("kglobalshortcutsrc", "kwin", k.name));
+    const former = !!e && e.active.length === 1 && e.active[0] === FORMER[k.name];
+    if (!k.key && !former) continue;
     // One you bound yourself stays as you have it.
-    if (e && e.active.length > 0) continue;
+    if (e && e.active.length > 0 && !former) continue;
+    const keys = k.key ? [k.key] : [];
     writes.push({
       file: "kglobalshortcutsrc",
       group: "kwin",
       key: k.name,
-      value: formatEntry({ active: [k.key], default: [k.key], name: `tide: ${k.title}` }),
+      value: formatEntry({ active: keys, default: keys, name: `tide: ${k.title}` }),
     });
   }
   for (const [group, key, value] of KWINRC) {
@@ -150,7 +161,9 @@ export function shortcutEntries(read) {
     if (value !== null) out.push({ file: "kglobalshortcutsrc", group, key, value });
   };
   for (const [group, entry] of TAKEN) add(group, entry);
-  for (const k of KEYS) if (k.key) add("kwin", k.name);
+  // A key with none now but a former default goes too, so the session
+  // lets the old key go.
+  for (const k of KEYS) if (k.key || FORMER[k.name]) add("kwin", k.name);
   return out;
 }
 
