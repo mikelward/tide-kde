@@ -197,6 +197,10 @@ export class Tide {
   }
 
   added(w, { quiet = false } = {}) {
+    if (w.dock) {
+      this.panelAdded(w);
+      return;
+    }
     if (!this.candidate(w)) return;
     const id = idOf(w);
     if (!this.watched.has(id)) {
@@ -240,7 +244,40 @@ export class Tide {
     else this.updateDim();
   }
 
+  // A panel takes room from the tiles, and gives it back as it moves,
+  // resizes or goes: KWin's placement area changes, but nothing tells a
+  // script, and Plasma's panels come after tide has laid out at login.
+  panelAdded(w) {
+    const id = idOf(w);
+    if (!this.watched.has(id)) {
+      this.watched.add(id);
+      w.frameGeometryChanged?.connect(() => this.panelsChanged());
+    }
+    this.panelsChanged();
+  }
+
+  // Lays out again now, and again once KWin has taken the change into
+  // its placement area. For a panel that goes, KWin does that after it
+  // says so, on a timer it starts afresh after the script hears; a few
+  // turns of its event loop later, the area has changed or won't.
+  panelsChanged() {
+    this.relayoutAll();
+    const areas = () => JSON.stringify(this.ws.screens.map((o) => this.area(o)));
+    const seen = areas();
+    let turns = 4;
+    const check = () => {
+      if (areas() !== seen) this.relayoutAll();
+      else if (--turns > 0) this.env.later(check);
+    };
+    this.env.later?.(check);
+  }
+
   removed(w) {
+    if (w.dock) {
+      this.watched.delete(idOf(w));
+      this.panelsChanged();
+      return;
+    }
     const id = idOf(w);
     const key = this.placed.get(id);
     this.placed.delete(id);

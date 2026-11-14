@@ -31,6 +31,7 @@ export class FakeWindow {
     this.transient = false;
     this.specialWindow = false;
     this.popupWindow = false;
+    this.dock = false;
     this.skipTaskbar = false;
     this.moveable = true;
     this.resizeable = true;
@@ -49,7 +50,7 @@ export class FakeWindow {
     this.frameGeometry = { x: 100, y: 100, width: 400, height: 300 };
     this.closed = false;
     for (const s of ["desktopsChanged", "outputChanged", "minimizedChanged", "fullScreenChanged", "maximizedChanged",
-      "activitiesChanged",
+      "activitiesChanged", "frameGeometryChanged",
       "interactiveMoveResizeStarted", "interactiveMoveResizeFinished"]) this[s] = new Signal();
     Object.assign(this, props);
   }
@@ -143,9 +144,16 @@ export class FakeWorkspace {
   windowList() {
     return [...this.windows];
   }
+  // The output less the panels along its bottom edge, as KWin's
+  // placement area leaves out a panel's room.
   clientArea(_option, output) {
     const g = output.geometry;
-    return { x: g.x, y: g.y, width: g.width, height: g.height };
+    let height = g.height;
+    for (const w of this.windows) {
+      const f = w.frameGeometry;
+      if (w.dock && w.output === output && f.y + f.height === g.y + g.height) height = Math.min(height, f.y - g.y);
+    }
+    return { x: g.x, y: g.y, width: g.width, height };
   }
   createDesktop(position, name) {
     this.desktops.splice(position, 0, this.newDesktop(name));
@@ -172,21 +180,25 @@ export class FakeWorkspace {
     return w;
   }
   close(w) {
+    // As KWin's own, a panel's room is still taken as it says it's gone
+    if (w.dock) this.windowRemoved.emit(w);
     this.windows = this.windows.filter((x) => x !== w);
     w.deleted = true;
     if (this.activeWindow === w) this.activeWindow = this.windows.at(-1) ?? null;
-    this.windowRemoved.emit(w);
+    if (!w.dock) this.windowRemoved.emit(w);
   }
 }
 
 // The env tide.js takes, around `ws`: shortcuts by name in `shortcuts`,
-// config from `config`, D-Bus calls in `calls`, the log in `logs`.
+// config from `config`, D-Bus calls in `calls`, the log in `logs`, and
+// what's to run later in `pending`, until `settle`.
 export function fakeEnv(ws, config = {}) {
   const env = {
     workspace: ws,
     KWin: { PlacementArea: 0, MaximizeArea: 2 },
     shortcuts: new Map(),
     calls: [],
+    pending: [],
     logs: [],
     registerShortcut(name, _title, _key, f) {
       env.shortcuts.set(name, f);
@@ -201,6 +213,12 @@ export function fakeEnv(ws, config = {}) {
     },
     print(text) {
       env.logs.push(text);
+    },
+    later(f) {
+      env.pending.push(f);
+    },
+    settle() {
+      while (env.pending.length) env.pending.shift()();
     },
     press(name) {
       const f = env.shortcuts.get(name);

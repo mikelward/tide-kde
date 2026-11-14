@@ -153,6 +153,12 @@ Status: **yes**, **partial**, **no**, or **differs** (done another way).
   workspaces by name. tide's own bar could run on Plasma later, fed by
   the script over D-Bus as a third backend beside Hyprland's and
   tidewm's (tide `shell/Compositor.qml`), but that's much more work.
+  - Tiles keep out of the panels' room, KWin's placement area. KWin has
+    no signal for that area changing, so tide lays out again as a panel
+    comes, moves or goes. Plasma's come after tide's first layout at
+    login. For one that goes, KWin updates the area only after a timer
+    it starts once scripts have heard, so tide looks again over the next
+    few turns of KWin's event loop (`later` in `main.js`).
 - **The layout symbol** is in a panel widget of its own, `plasmoid/`,
   showing the layout of the workspace on its panel's monitor, as tide's
   bar does. A click is the next layout.

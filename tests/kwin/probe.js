@@ -25,6 +25,10 @@ registerShortcut("probe-dump", "probe: dump the state", "", () => {
   print("probe: dump " + JSON.stringify({
     desktops: workspace.desktops.map((d) => d.name),
     current: workspace.currentDesktop.name,
+    area: (() => {
+      const a = workspace.clientArea(KWin.PlacementArea, workspace.activeScreen, workspace.currentDesktop);
+      return [a.x, a.y, a.width, a.height];
+    })(),
     windows,
   }));
 });
