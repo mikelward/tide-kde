@@ -162,7 +162,7 @@ Status: **yes**, **partial**, **no**, or **differs** (done another way).
 |---|---|---|
 | Apps and Actions | yes | tide's Plasma launcher, as before |
 | Workspaces and Windows | yes | tide's launcher reads KWin's own D-Bus as it opens: its desktops, its window search's windows, and each window's app and desktop (tide §8.5, mikelward/tide#445). It needs only stock KWin, not this script |
-| Attention | no | tide's focus guard marks windows for it, and Plasma doesn't run it |
+| Attention | yes | The windows KWin marks as wanting attention: those its focus stealing prevention keeps from taking focus, and those that ask. KWin's D-Bus doesn't say which (its `getWindowInfo` and window runner have no such field), so the script follows each window's `demandsAttention` and writes their UUIDs, as JSON, to the desktop's settings in plasmashell (group `tide`, key `attention`), as it writes the layout widget's. tide's launcher reads them as it opens (tide §8.5) |
 
 ### 4.7 Bar, login and lock
 
