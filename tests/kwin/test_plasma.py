@@ -91,12 +91,42 @@ class PanelTest(PlasmaTest):
 
 @unittest.skipUnless(REQUIRED or shutil.which(PLASMASHELL), "no plasmashell")
 class SetupTest(PlasmaTest):
-    def test_setup_gives_the_lock_screen_the_desktops_wallpaper_and_adds_the_widget_once(self):
+    def js(self, code):
+        return self.qdbus("org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript", code)
+
+    def setup(self):
+        r = subprocess.run(["node", os.path.join(ROOT, "scripts", "setup.mjs")], env=self.env,
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return r
+
+    def test_setup_moves_the_widget_after_the_pager(self):
+        self.shows("[]=")
+        # The widget at the end of Plasma's own panel, beside the clock
+        self.js('panels().filter((p) => p.location == "top").forEach((p) => p.remove());'
+                ' panels()[0].addWidget("org.tide.layout");')
+        self.setup()
+        order = self.js('const p = panels()[0];'
+                        ' print(p.widgets().sort((a, b) => a.index - b.index).map((w) => w.type).join(" "))')
+        self.assertIn("org.kde.plasma.pager org.tide.layout ", order)
+        saved = self.js('const p = panels()[0]; p.currentConfigGroup = ["General"];'
+                        ' const ids = p.readConfig("AppletOrder").split(";");'
+                        ' print(ids.indexOf(String(p.widgets("org.tide.layout")[0].id))'
+                        ' - ids.indexOf(String(p.widgets("org.kde.plasma.pager")[0].id)))')
+        self.assertEqual(saved, "1", "Plasma keeps the order")
+        # Again, it stays
+        self.setup()
+        self.assertEqual(order, self.js('const p = panels()[0];'
+                                        ' print(p.widgets().sort((a, b) => a.index - b.index).map((w) => w.type).join(" "))'))
+
+    def test_setup_gives_the_lock_screen_the_desktops_wallpaper_adds_the_widget_once_and_names_the_pagers(self):
         self.shows("[]=")
         self.qdbus("org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript",
                    'const d = desktops()[0]; d.wallpaperPlugin = "org.kde.image";'
                    ' d.currentConfigGroup = ["Wallpaper", "org.kde.image", "General"];'
                    ' d.writeConfig("Image", "file:///pictures/sea.jpg");')
+        self.qdbus("org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript",
+                   'panels()[0].addWidget("org.kde.plasma.pager");')
         r = subprocess.run(["node", os.path.join(ROOT, "scripts", "setup.mjs")], env=self.env,
                            capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
@@ -107,3 +137,7 @@ class SetupTest(PlasmaTest):
         count = self.qdbus("org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript",
                            'print(panels().reduce((n, p) => n + p.widgets("org.tide.layout").length, 0))')
         self.assertEqual(count, "1", "the panel had one already")
+        shown = self.qdbus("org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript",
+                           'const w = panels()[0].widgets("org.kde.plasma.pager")[0];'
+                           ' w.currentConfigGroup = ["General"]; print(w.readConfig("displayedText"));')
+        self.assertEqual(shown, "1", "the Pager shows the workspaces' names")

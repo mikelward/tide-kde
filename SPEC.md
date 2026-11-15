@@ -167,7 +167,8 @@ Status: **yes**, **partial**, **no**, or **differs** (done another way).
 ### 4.7 Bar, login and lock
 
 - **The bar** is Plasma's panel, to start with: its Pager shows the
-  workspaces by name. tide's own bar could run on Plasma later, fed by
+  workspaces by name once `make setup` sets its Text to the desktops'
+  names (Plasma's default is none). tide's own bar could run on Plasma later, fed by
   the script over D-Bus as a third backend beside Hyprland's and
   tidewm's (tide `shell/Compositor.qml`), but that's much more work.
   - Tiles keep out of the panels' room, KWin's placement area. KWin gives
@@ -179,7 +180,10 @@ Status: **yes**, **partial**, **no**, or **differs** (done another way).
     few turns of KWin's event loop (`later` in `main.js`).
 - **The layout symbol** is in a panel widget of its own, `plasmoid/`,
   showing the layout of the workspace on its panel's monitor, as tide's
-  bar does. A click is the next layout.
+  bar does. A click is the next layout. `make setup` puts it just after
+  the Pager, where tide's bar has it, after the workspaces. It sets the
+  widget's `index`, its place in the panel, which Plasma moves it to and
+  saves; the panel's saved order, `AppletOrder`, is read only at start.
   - A script can call D-Bus but can't be called: the script API has
     `callDBus` and nothing to serve a call (`scripting.cpp`). So it can't
     serve the widget. Instead it writes the widget's settings through
