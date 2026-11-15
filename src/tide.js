@@ -243,7 +243,10 @@ export class Tide {
       w.moveableChanged?.connect(again);
       w.resizeableChanged?.connect(again);
       w.interactiveMoveResizeStarted?.connect(() => this.dragStarted(w));
+      w.interactiveMoveResizeStepped?.connect((g) => this.dragStepped(w, g));
       w.interactiveMoveResizeFinished?.connect(() => this.dragFinished(w));
+      w.frameGeometryAboutToChange?.connect(() => this.dragAsked(w, true));
+      w.frameGeometryChanged?.connect(() => this.dragAsked(w, false));
     }
     this.place(w, quiet ? null : this.ws.activeWindow);
   }
@@ -371,12 +374,18 @@ export class Tide {
     if (windows.length === 0) return;
     const area = this.area(output, desktop);
     const boxes = layout.arrange(this.parts.get(key), area, windows.map(idOf), this.config);
-    for (const w of windows) {
-      const b = boxes.get(idOf(w));
+    windows.forEach((w) => {
+      const id = idOf(w);
+      const b = boxes.get(id);
       const want = { x: b.x, y: b.y, width: b.w, height: b.h };
-      this.boxes.set(idOf(w), want);
-      if (!sameBox(w.frameGeometry, want)) w.frameGeometry = want;
-    }
+      // Where tide last asked it to be, which it may yet be going to
+      const asked = this.boxes.get(id);
+      this.boxes.set(id, want);
+      // KWin has the one whose edge you're dragging, until you let go
+      const from = this.dragFrom.get(id);
+      if (from && from.resize) return;
+      if (!sameBox(w.frameGeometry, want) || (asked && !sameBox(asked, want))) w.frameGeometry = want;
+    });
   }
 
   relayoutAll() {
@@ -632,7 +641,82 @@ export class Tide {
 
   dragStarted(w) {
     const g = w.frameGeometry;
-    this.dragFrom.set(idOf(w), { x: g.x, y: g.y, width: g.width, height: g.height, resize: !!w.resize });
+    const from = { x: g.x, y: g.y, width: g.width, height: g.height, resize: !!w.resize, last: null, share: null, asked: false };
+    // The main share and the lone window's width as the drag began, which
+    // an edge dragged back to where it was gives back.
+    const part = this.parts.get(this.placed.get(idOf(w)));
+    if (part) from.share = { mode: part.mode, mfact: part.opts[part.mode]?.mfact, singleWidth: part.singleWidth };
+    this.dragFrom.set(idOf(w), from);
+  }
+
+  // As a tile's edge is dragged, the tiles beside it follow: each step
+  // sets the main share, or a lone window's width, as letting go does.
+  // `g` is where KWin has the window going, which its frame follows once
+  // the app has resized.
+  dragStepped(w, g) {
+    const id = idOf(w);
+    const from = this.dragFrom.get(id);
+    const key = this.placed.get(id);
+    if (!from || !from.resize || !g || key === undefined || !this.tiled(w)) return;
+    from.last = { x: g.x, y: g.y, width: g.width, height: g.height };
+    from.asked = false;
+    if (this.resized(w, key, from, from.last)) this.relayout(key);
+  }
+
+  // Sets the main share of the part at `key`, or its lone window's width,
+  // from tile `w`'s edge having been dragged from box `from` to `now`.
+  // Returns whether either changed.
+  resized(w, key, from, now) {
+    const part = this.parts.get(key);
+    const ids = this.tiledIn(key).map(idOf);
+    const area = this.area(this.outputOf(key), this.desktopOf(key));
+    // Back where it began, after steps that moved it: as it was then
+    if (now.x === from.x && now.width === from.width) return this.restoreShare(part, from.share);
+    if (ids.length === 1) {
+      const f = geometry.singleWidthFor(area, { x: from.x, w: from.width }, { x: now.x, w: now.width });
+      if (f === null || f === part.singleWidth) return false;
+      part.singleWidth = f;
+      return true;
+    }
+    const right = now.x + now.width !== from.x + from.width;
+    const edge = right ? "right" : now.x !== from.x ? "left" : null;
+    if (!edge) return false;
+    const x = edge === "right" ? now.x + now.width : now.x;
+    const opts = part.opts[part.mode];
+    const m = geometry.mfactFor(part.mode, area, ids.length, opts, layout.singleRules(part, this.config), ids.indexOf(idOf(w)), edge, x);
+    if (m === null || m === opts.mfact) return false;
+    layout.setMfact(part, m);
+    return true;
+  }
+
+  // Notes whether KWin has asked the window being dragged for a geometry
+  // since the drag's last step, which is how a resize cancelled shows.
+  // - KWin says only that a resize finished, cancelled or not, and a
+  //   script can't read where KWin has the window going.
+  // - But each step asks the window for its geometry and then says it
+  //   stepped (Window::updateInteractiveMoveResize), and a cancel asks it
+  //   to go back to where it began, with no step, and then says it
+  //   finished (Window::finishInteractiveMoveResize). Each asking shows as
+  //   frameGeometryAboutToChange (XdgSurfaceWindow::moveResizeInternal).
+  // - A frame that changes is the app catching up, not a cancel.
+  // - An X11 window's steps and cancel go another way
+  //   (X11Window::doInteractiveResizeSync), so its cancel doesn't show,
+  //   and ends as letting go does.
+  dragAsked(w, asked) {
+    const from = this.dragFrom.get(idOf(w));
+    if (from) from.asked = asked;
+  }
+
+  // Gives the part back the main share and lone window's width it had as
+  // a drag began, `share`. Returns whether either changed.
+  restoreShare(part, share) {
+    if (!share || share.mode !== part.mode) return false;
+    const opts = part.opts[part.mode];
+    const changed = part.singleWidth !== share.singleWidth || (opts && opts.mfact !== share.mfact);
+    if (share.singleWidth === undefined) delete part.singleWidth;
+    else part.singleWidth = share.singleWidth;
+    if (opts && share.mfact !== undefined) opts.mfact = share.mfact;
+    return !!changed;
   }
 
   // A tiled window dropped on another swaps with it; one whose edge was
@@ -646,23 +730,11 @@ export class Tide {
     if (!from || key === undefined || !this.tiled(w)) return;
     const part = this.parts.get(key);
     const windows = this.tiledIn(key);
-    const ids = windows.map(idOf);
-    const now = w.frameGeometry;
     if (from.resize) {
-      const area = this.area(this.outputOf(key), this.desktopOf(key));
-      if (ids.length === 1) {
-        const f = geometry.singleWidthFor(area, { x: from.x, w: from.width }, { x: now.x, w: now.width });
-        if (f !== null) part.singleWidth = f;
-      } else {
-        const right = now.x + now.width !== from.x + from.width;
-        const edge = right ? "right" : now.x !== from.x ? "left" : null;
-        if (edge) {
-          const x = edge === "right" ? now.x + now.width : now.x;
-          const opts = part.opts[part.mode];
-          const m = geometry.mfactFor(part.mode, area, ids.length, opts, layout.singleRules(part, this.config), ids.indexOf(id), edge, x);
-          if (m !== null) layout.setMfact(part, m);
-        }
-      }
+      // Cancelled, as with Escape: the share it had as the drag began
+      if (from.asked) this.restoreShare(part, from.share);
+      // Where KWin last had it going, which its frame may not have reached
+      else this.resized(w, key, from, from.last || w.frameGeometry);
     } else {
       const c = this.ws.cursorPos;
       const target = windows.find((o) => {

@@ -62,6 +62,131 @@ test("dragging the stack's edge sets the main share too", () => {
   assert.deepEqual([box(a), box(b)], [[0, 0, 960, 1080], [960, 0, 960, 1080]]);
 });
 
+test("the stack follows the master's edge as it's dragged", () => {
+  const { ws } = start();
+  const a = ws.open();
+  const b = ws.open();
+  const c = ws.open();
+  a.resizeStart();
+  a.resizeStep({ width: 1100 });
+  assert.deepEqual([box(a), box(b), box(c)], [[0, 0, 1100, 1080], [1100, 0, 820, 540], [1100, 540, 820, 540]]);
+  a.resizeStep({ width: 1200 });
+  assert.deepEqual([box(b), box(c)], [[1200, 0, 720, 540], [1200, 540, 720, 540]]);
+  a.resizeEnd();
+  assert.deepEqual([box(a), box(b), box(c)], [[0, 0, 1200, 1080], [1200, 0, 720, 540], [1200, 540, 720, 540]]);
+});
+
+test("the master follows the stack's edge as it's dragged", () => {
+  const { ws } = start();
+  const a = ws.open();
+  const b = ws.open();
+  b.resizeStart();
+  b.resizeStep({ x: 960, width: 960 });
+  assert.deepEqual([box(a), box(b)], [[0, 0, 960, 1080], [960, 0, 960, 1080]]);
+  b.resizeEnd();
+  assert.deepEqual([box(a), box(b)], [[0, 0, 960, 1080], [960, 0, 960, 1080]]);
+});
+
+test("an edge dragged away and back leaves the tiles as they were", () => {
+  const { ws } = start();
+  const a = ws.open();
+  const b = ws.open();
+  a.resizeStart();
+  a.resizeStep({ width: 1200 });
+  assert.deepEqual(box(b), [1200, 0, 720, 1080]);
+  a.resizeStep({ width: 1056 });
+  assert.deepEqual(box(b), [1056, 0, 864, 1080]);
+  a.resizeEnd();
+  assert.deepEqual([box(a), box(b)], [[0, 0, 1056, 1080], [1056, 0, 864, 1080]]);
+  // The share is the one it had, not one that lands on the same pixel
+  ws.open();
+  assert.equal(box(a)[2], 1056);
+});
+
+test("a lone window's edge dragged away and back leaves its width as it was", () => {
+  const { ws } = start({ outputs: [{ name: "wide", x: 0, y: 0, width: 3440, height: 1440 }] });
+  const a = ws.open();
+  assert.deepEqual(box(a), [344, 0, 2752, 1440]);
+  a.resizeStart();
+  a.resizeStep({ width: 2852 });
+  a.resizeStep({ width: 2752 });
+  a.resizeEnd();
+  assert.deepEqual(box(a), [344, 0, 2752, 1440]);
+  // And one already given a width keeps that
+  a.drag({ width: 2852 }, { resize: true });
+  const given = box(a);
+  a.resizeStart();
+  a.resizeStep({ x: given[0], width: given[2] + 100 });
+  a.resizeStep({ x: given[0], width: given[2] });
+  a.resizeEnd();
+  assert.deepEqual(box(a), given);
+});
+
+test("a resize cancelled leaves the tiles as they were", () => {
+  const { ws } = start();
+  const a = ws.open();
+  const b = ws.open();
+  const began = a.frameGeometry;
+  a.resizeStart();
+  a.resizeStep({ width: 1200 });
+  assert.deepEqual(box(b), [1200, 0, 720, 1080]);
+  a.resizeCancel(began);
+  assert.deepEqual([box(a), box(b)], [[0, 0, 1056, 1080], [1056, 0, 864, 1080]]);
+  // And the share is the one it had
+  ws.open();
+  assert.equal(box(a)[2], 1056);
+});
+
+test("a lone window's resize cancelled leaves its width as it was", () => {
+  const { ws } = start({ outputs: [{ name: "wide", x: 0, y: 0, width: 3440, height: 1440 }] });
+  const a = ws.open();
+  const began = a.frameGeometry;
+  a.resizeStart();
+  a.resizeStep({ width: 2852 });
+  a.resizeCancel(began);
+  assert.deepEqual(box(a), [344, 0, 2752, 1440]);
+});
+
+test("a resize cancelled before the app caught up leaves the tiles as they were", () => {
+  const { ws } = start({ lag: true });
+  const a = ws.open();
+  const b = ws.open();
+  ws.ack();
+  const began = a.frameGeometry;
+  a.resizeStart();
+  a.resizeStep({ width: 1200 });
+  a.resizeCancel(began);
+  ws.ack();
+  assert.deepEqual([box(a), box(b)], [[0, 0, 1056, 1080], [1056, 0, 864, 1080]]);
+});
+
+test("the window being dragged is KWin's until you let go", () => {
+  const { ws } = start();
+  const a = ws.open();
+  ws.open();
+  a.resizeStart();
+  // Taller too, as a corner drags: only its edge counts, and tide leaves
+  // the window where KWin has it
+  a.resizeStep({ width: 1200, height: 900 });
+  assert.deepEqual(box(a), [0, 0, 1200, 900]);
+  a.resizeEnd();
+  assert.deepEqual(box(a), [0, 0, 1200, 1080]);
+});
+
+test("letting go takes where KWin last had the window going, not its frame", () => {
+  const { ws } = start({ lag: true });
+  const a = ws.open();
+  const b = ws.open();
+  ws.ack();
+  a.resizeStart();
+  a.resizeStep({ width: 1200 });
+  // The app hasn't resized yet: its frame is still the old one
+  assert.equal(box(a)[2], 1056);
+  a.resizeEnd();
+  ws.ack();
+  assert.deepEqual([box(a), box(b)], [[0, 0, 1200, 1080], [1200, 0, 720, 1080]]);
+});
+
 test("dragging a lone window's edge sets its width, centered", () => {
   const { ws } = start();
   const a = ws.open();
