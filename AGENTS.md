@@ -1,13 +1,14 @@
 ---
 trigger: always_on
 alwaysApply: true
-last_modified: 2026-11-14
+last_modified: 2026-11-15
 ---
 
 # tide-kde
 
 tide on KDE Plasma: tide for Linux's tiling, workspaces, dim and keys as a KWin 6
-script, with a layout widget for Plasma's panel. tide's launcher and its
+script, with a layout widget for Plasma's panel and a window decoration in C++
+(`decoration/`) that makes a window's shadow its resize zone. tide's launcher and its
 `tide-kde.service` stay tide's. `SPEC.md` says what KWin allows and at what cost;
 `TODO.md` what's next.
 
@@ -120,8 +121,12 @@ Shared by every mikelward repo and the user-level agent config; canonical in mik
   APIs outside tests. Keep KWin's API in `tide.js`, so the rest tests in plain Node.
 - **KWin claims**. Checked against KWin 6's source or a running `kwin_wayland`; mark
   the rest *(unverified)*, as `SPEC.md` does.
-- **Tests**. `make lint test` (Node) and `make test-kwin` (a headless `kwin_wayland`,
-  `tests/kwin/`); every `*_test.js` must be listed in the `Makefile`. `make
+- **Decoration**. `decoration/zones.h` holds its rules, free of Qt, tested by `make
+  test-zones`; `decoration.cpp` is the KDecoration3 plugin, built with warnings as
+  errors by `make decoration`. It runs inside KWin: a crash there ends the session.
+- **Tests**. `make lint test` (Node), `make test-zones` (C++) and `make test-kwin` (a
+  headless `kwin_wayland`, `tests/kwin/`, with the decoration and a pointer of the
+  tests' own); every `*_test.js` must be listed in the `Makefile`. `make
   check-tideco` compares the copied geometry with tide for Chrome's, and `make
   check-tide-defaults` the defaults that restate tide's with a tide checkout.
 - **KWin**. Only a headless one runs here, in a container from `ubuntu:devel` (CI's

@@ -18,7 +18,11 @@ which this script tells it.
   wide, centered, on an ultrawide, and 60% from an aspect of 3.2.
 - **Mouse.** Drag a tiled window onto another to swap them. Drag the edge
   between the master and the stack to set the split, or a lone window's
-  edge to set its width.
+  edge to set its width; the other tiles follow as you drag.
+- **Shadows.** With tide's decoration (Decoration, below), a window's
+  shadow is where a drag resizes it: all around a floating window, and
+  across a tile's edge that has something to resize. With shadows off,
+  it's the 8 px outside a floating window and 4 px outside a tile's edge.
 - **Floating.** Dialogs, windows of a fixed size and windows on every
   desktop float, as do those you float with the key.
 - **Dimming inactive windows.** Plasma's Dim Inactive effect dims every
@@ -53,6 +57,46 @@ That builds the script, installs it and the layout widget with
 `dist/tide.kwinscript`, for System Settings → Window Management → KWin
 Scripts → Install from File, and `dist/tide-layout.plasmoid`, for Add
 Widgets → Get New → Install Widget From Local File.
+
+## Decoration
+
+tide's window decoration draws tide's shadow, border and corners, and makes
+the shadow the place a drag resizes a window (SPEC.md §4.8). It's a KWin
+plugin in C++, built on your machine, Linux only:
+
+    make install-decoration
+    make setup
+
+Then log in again. It needs a C++ compiler, CMake, extra-cmake-modules and
+the headers of Qt 6, KDecoration3, KCoreAddons and KConfig. On Ubuntu:
+
+    sudo apt install g++ cmake extra-cmake-modules qt6-base-dev qt6-declarative-dev \
+        libkdecorations3-dev libkf6coreaddons-dev libkf6config-dev
+
+- It installs for you alone, in `~/.local/lib/qt6/plugins`, and adds that
+  to Plasma's `QT_PLUGIN_PATH` with
+  `~/.config/plasma-workspace/env/tide-kde.sh`. `make install-decoration
+  PLUGIN_DIR=DIR` installs elsewhere.
+- `make setup` chooses it, in `kwinrc`'s `[org.kde.kdecoration2]`
+  `library`, and copies tide's Borders settings to it. Run it again after
+  changing them.
+- It runs inside KWin, so a fault in it takes the session down. If KWin
+  can't load it, as after an upgrade, windows get Breeze: build it again.
+- Windows keep a title bar. An app that draws its own, as GTK's do, gets
+  none of this.
+- `make uninstall-decoration` takes it out. Choose another in System
+  Settings → Colors & Themes → Window Decorations, or KWin uses Breeze.
+
+Its settings are in `kwinrc`, under `[tide-decoration]`, which `make setup`
+writes from tide's `appearance.json` and `appearance.local.json`:
+
+| Setting | Default | What it does |
+|---|---|---|
+| `Shadows` | `focused` | which windows cast a shadow: `none`, `floating`, `focused` or `all` |
+| `ShadowSize` | `16` | how far it reaches, in pixels, up to 32 |
+| `BorderWidth` | `0` | a border's width, up to 16 |
+| `RoundedCorners` | `true` | whether corners are round |
+| `TitleBar` | `true` | `false` takes the title bar off; `make setup` leaves it |
 
 ## Keys
 
@@ -100,7 +144,9 @@ After `make install`, this sets Plasma up as tide has it:
 - puts the layout widget just after the Pager, as tide's bar has it after
   the workspaces, adding it to that panel if no panel has it;
 - has the panels' Pagers show the workspaces' names;
-- gives the lock screen the desktop's wallpaper, as it is then.
+- gives the lock screen the desktop's wallpaper, as it is then;
+- with tide's decoration installed, chooses it and copies tide's Borders
+  settings to it.
 
 `make uninstall` leaves these as they are, and there's no undo for them
 yet (TODO.md). `node scripts/setup.mjs --dry-run` says what it would
@@ -137,14 +183,17 @@ tide's face on it needs a change to Plasma (SPEC.md §4.7).
 ## Development
 
     make lint test        # Node: the layouts, workspaces and settings, and tide.js on a fake KWin
-    make test-kwin        # the script in a headless KWin
+    make test-kwin        # the script and the decoration in a headless KWin
+    make test-zones       # the decoration's rules, with only a C++ compiler
     make check-tideco     # the geometry and defaults check are tide for Chrome's, unchanged
     make check-tide-defaults  # the layout defaults and standing workspaces are tide's
 
 `make test-kwin` needs `kwin_wayland`, KWin's package structures
 (Debian's and Ubuntu's `kwin-common`), `kpackagetool6`, `kreadconfig6`
 and `kwriteconfig6`, `foot`, `qdbus6`, `dbus-run-session`, Python 3 and
-Node; CI runs it on Ubuntu's devel release. It also runs the layout
+Node; what the decoration builds with (Decoration, above); and, for the
+tests' pointer, a C compiler, `wayland-scanner`, `pkg-config`, libwayland's
+headers and plasma-wayland-protocols. CI runs it on Ubuntu's devel release. It also runs the layout
 widget in a real plasmashell when there's one (Ubuntu's
 `plasma-desktop`), as CI's `plasma` job does. KWin's script engine lacks
 some of what Node runs, which `scripts/bundle.mjs` refuses (SPEC.md §2).

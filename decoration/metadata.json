@@ -1,0 +1,14 @@
+{
+    "KPlugin": {
+        "Description": "tide's window decoration: a window's shadow is where a drag resizes it",
+        "EnabledByDefault": false,
+        "Id": "org.tide.decoration",
+        "License": "Apache-2.0",
+        "Name": "tide",
+        "Website": "https://github.com/mikelward/tide-kde"
+    },
+    "org.kde.kdecoration3": {
+        "blur": false,
+        "recommendedBorderSize": "None"
+    }
+}

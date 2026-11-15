@@ -27,10 +27,12 @@ jobs:
           node-version: 22
       - run: make lint
       - run: make test
+      - run: make test-zones
       - run: make check-tideco TIDECO=tideco
       - run: make check-tide-defaults TIDE=tide
-  # The script in a real, headless KWin. Ubuntu's devel release packages
-  # KWin 6; Debian testing has no kwin-wayland.
+  # The script and the decoration in a real, headless KWin. Ubuntu's devel
+  # release packages KWin 6; Debian testing has no kwin-wayland. The second
+  # line of packages builds the decoration, and the third the tests' pointer.
   kwin:
     runs-on: ubuntu-latest
     container: ubuntu:devel
@@ -38,7 +40,9 @@ jobs:
       - run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            ca-certificates git kwin-wayland kwin-common kpackagetool6 libkf6config-bin foot qdbus-qt6 dbus python3 nodejs make
+            ca-certificates git kwin-wayland kwin-common kpackagetool6 libkf6config-bin foot qdbus-qt6 dbus python3 nodejs make \
+            g++ cmake extra-cmake-modules qt6-base-dev qt6-declarative-dev libkdecorations3-dev libkf6coreaddons-dev libkf6config-dev \
+            gcc pkgconf libwayland-dev libwayland-bin plasma-wayland-protocols
       - uses: actions/checkout@v4
         with:
           persist-credentials: false

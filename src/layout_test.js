@@ -163,3 +163,34 @@ test("new settings reset the shares but keep the mode", () => {
   assert.equal(p.mode, "threecol");
   assert.equal(p.opts.tile.mfact, 0.7);
 });
+
+test("the sides of a tile that a drag moves", () => {
+  const part = (mode, nmaster) => {
+    const p = layout.create({ x: 0, y: 0, w: 1920, h: 1080 });
+    p.mode = mode;
+    if (nmaster !== undefined) p.opts[mode].nmaster = nmaster;
+    return p;
+  };
+  const area = { x: 0, y: 0, w: 1920, h: 1080 };
+  const all = (p, n) => Array.from({ length: n }, (_, i) => layout.dragEdges(p, n, i, { x: 0, w: 100 }, area));
+  const { left, right } = layout.EDGES;
+  // A lone window's sides, unless it's as wide as the monitor
+  assert.equal(layout.dragEdges(part("tile"), 1, 0, { x: 192, w: 1536 }, area), left | right);
+  assert.equal(layout.dragEdges(part("tile"), 1, 0, { x: 0, w: 1920 }, area), 0);
+  // tile: the edge between the masters and the stack
+  assert.deepEqual(all(part("tile"), 3), [right, left, left]);
+  assert.deepEqual(all(part("tile", 2), 3), [right, right, left]);
+  // All masters, or none, are rows: nothing to drag
+  assert.deepEqual(all(part("tile", 3), 3), [0, 0, 0]);
+  assert.deepEqual(all(part("tile", 0), 2), [0, 0]);
+  // threecol with one stack window is master and a column
+  assert.deepEqual(all(part("threecol"), 2), [right, left]);
+  // With stacks either side, both of the master's sides, and each stack's
+  // inner one: the stack goes right, left, right
+  assert.deepEqual(all(part("threecol"), 4), [left | right, left, right, left]);
+  // twocol: the last master's right and the stack's left; the masters
+  // share their side equally
+  assert.deepEqual(all(part("twocol"), 3), [0, right, left]);
+  assert.deepEqual(all(part("twocol"), 2), [0, 0]);
+  assert.deepEqual(all(part("monocle"), 2), [0, 0]);
+});

@@ -2,7 +2,8 @@
 
 **Status: the basics are built:** the layouts, the mouse, floating, the
 workspaces and their keys, dimming inactive windows, the layout widget,
-setup and releases (§4); the settings are in the README. The rest of
+a window decoration whose shadow is the drag-to-resize zone (§4.8), setup
+and releases (§4); the settings are in the README. The rest of
 this explores what KWin allows. It takes what tide for Linux does under
 Hyprland ([mikelward/tide](https://github.com/mikelward/tide)), and what
 tidewm and tidesway carry of it in their compositors
@@ -48,6 +49,11 @@ default to KConfig's `readEntry`, which reads the value as the default's
 type, so with no default it gives nothing, even for a key that's set. A
 script can't read other files, so tide's `layouts.json` (tide §16) can't
 reach it: its settings are its own (README.md).
+
+A script can't see a pointer press, set a cursor, start a pointer resize
+or draw a shadow: `workspace_wrapper.h` and `window.h` have none of them.
+A window decoration can do the last three. It is a KDecoration3 plugin, in
+C++, loaded into KWin itself (§4.8).
 
 KWin's script engine is Qt's QV4. ES modules don't load in it, so
 `scripts/bundle.mjs` joins `src/` into one script. A headless KWin shows
@@ -117,7 +123,8 @@ Status: **yes**, **partial**, **no**, or **differs** (done another way).
 | Two columns plus a stack; monocle | yes | Script geometry |
 | `mfact`, `nmaster` keys | yes | `registerShortcut` |
 | Single window at 80% on a wide monitor (60% from 3.2) | yes | Script geometry, by each monitor's aspect |
-| Drag to swap; edge drag to set the split | partial | `interactiveMoveResizeFinished` tells where a drag ended; the script re-lays out from there. Mid-drag feedback is KWin's *(unverified)* |
+| Drag to swap | partial | `interactiveMoveResizeFinished` tells where a drag ended; the script re-lays out from there. Mid-drag, the window moves as KWin moves it |
+| Edge drag to set the split, from a window's shadow | yes, with tide's decoration | §4.8. The tiles beside the edge follow as it's dragged (`interactiveMoveResizeStepped`). Without the decoration there's no zone to press: KWin's own resize, as `Meta` and the right button, still sets the split |
 | Maximize and fullscreen | yes | KWin's own, `setMaximize` and `fullScreen`, on tide for Linux's keys; such a window leaves the layout |
 | Floating: dialogs, fixed-size windows, windows on every desktop, and the float key | yes | The script leaves them out of the layout, where KWin placed them |
 
@@ -262,6 +269,154 @@ attention, or a floating one from the next output.
   Their tide versions (tide §9, §10, §13, §15) need a session Plasma
   doesn't share.
 
+### 4.8 Shadows, borders and drag to resize (tide §6.2, §6.4, §6.6)
+
+tide's standard, on every compositor: a window's shadow is where a drag
+resizes it, floating or tiled, and the zone is at least as wide as the
+shadow (tide §6.6). On Plasma that takes a window decoration, `decoration/`:
+`org.tide.decoration`, a KDecoration3 plugin. It is optional. Without it,
+windows keep Plasma's decoration and its resize zone.
+
+| Feature | Status | How |
+|---|---|---|
+| A floating window's shadow is its resize zone | yes | The decoration's resize-only borders, as far out as the shadow reaches |
+| The zone with shadows off: 8 px | yes | The same borders, 8 px |
+| A window that casts no shadow has the same zone | yes | The zone follows the setting, not the shadow drawn |
+| A tile's shadow across the master/stack edge drags it; so do a lone window's sides | yes | The script tells the decoration which sides drag |
+| Edges at the display's edge, and a stack's rows, don't drag | yes | Those sides get no zone |
+| 4 px either side of a tiled edge with no shadow | differs | 4 px outside the window only (below) |
+| The tiles beside the edge follow the drag | yes | `interactiveMoveResizeStepped` |
+| Which windows cast a shadow, and how far | yes | `shadows` and `shadowSize`, through `make setup` |
+| A border, in the palette's surface-3 | yes | `borderWidth`; dark or light by Plasma's colors |
+| Rounded corners | yes | `roundedCorners`: 6 px, as on Hyprland |
+| No title bar | no | The decoration draws one, as Plasma's did (TODO.md) |
+| A change on tide's Borders page applies at once | no | `make setup` copies the settings (below) |
+
+**How KWin makes it a zone.** Read in KWin 6.7.5 and KDecoration 6.7.5,
+and run in a headless KWin (§6):
+
+- A decorated window takes the pointer over its borders and its
+  *resize-only borders*, a margin outside the frame
+  (`Window::updateDecorationInputShape`, `Window::hitTest`). The shadow is
+  drawn apart and takes no input. So the decoration sets the margin to the
+  shadow's reach (`Decoration::setResizeOnlyBorders`).
+- KDecoration says which side or corner the pointer is by
+  (`Decoration::Private::updateSectionUnderMouse`). KWin shows its resize
+  cursor there and starts its own resize on a press
+  (`Window::processDecorationMove`, `processDecorationButtonPress`).
+- The press activates and raises the window, and never reaches the window
+  under the zone. The pointer over the zone is over the zone's window, so
+  the focus doesn't move to the one below.
+- The topmost window under the pointer takes it
+  (`InputRedirection::findToplevel`). KWin raises a window as it's
+  activated (`Workspace::activateWindow`), so the focused tile's zone lies
+  over its neighbor.
+
+**The shadow** is tide's on every compositor: black at 0x44 by the
+window's edge, fading as the square of the distance, gone at `shadowSize`
+(tide §6.2). The decoration draws it once for each size and hands it to
+KWin (`Decoration::setShadow`), which stretches its sides.
+
+**Tiles.** KWin has no idea of a tile, so the script tells the decoration
+which sides of each a drag moves (`layout.dragEdges`): those on the edge
+between the masters and the stack, either side of three columns' centered
+master, and a lone window's when it's narrower than the monitor.
+
+- **The channel** is D-Bus. A script can call it (`callDBus`), and the
+  decoration, being inside KWin, serves `/org/tide/Decoration` on KWin's
+  own name: `setEdges(window, edges)`, with the window's `internalId` and
+  the sides as `Qt::Edges`, or -1 for a window that's no tile.
+  `describe(window)` answers what the decoration has, for the tests.
+- **The decoration knows its window** by its parent: KWin makes a
+  decoration with the window as its `QObject` parent
+  (`DecorationBridge::createDecoration`), whose `internalId` property is
+  the script's. That isn't KDecoration's API. If KWin stops doing it, every
+  window gets a floating window's zone.
+- **A window the script hasn't spoken of floats.** So without the script,
+  every window has the zone all around.
+- **The two start in either order.** The decoration hears nothing said
+  before it started, and `callDBus` tells a script nothing of a call
+  that failed. So as the decoration starts, it has the script say every
+  tile's sides again, by pressing its `tide-announce` shortcut through
+  KGlobalAccel, as the layout widget does (§4.7). That covers a
+  decoration chosen while tide is tiling, and one KWin loads again. As
+  the script starts, it has the decoration forget what a script before it
+  said (`reset`), and then says its own. KWin makes a window's decoration
+  again as settings change; the sides are kept apart from it.
+- **As the script stops, every window floats again.** KWin tells a script
+  nothing as it stops; it deletes it (`Scripting::unloadScript`,
+  `AbstractScript::stop`). So the decoration watches KWin's scripts, the
+  children of the object at `/Scripting`, and as one goes asks KWin
+  whether tide's is still loaded (`Scripting::isScriptLoaded`). That is
+  KWin's own layout, not an API.
+- **A side drags whole.** KDecoration would take a corner near a side's
+  end. The decoration hands it the pointer at the side's middle instead
+  (`sectionPoint` in `zones.h`).
+- **The rest follow the drag.** KWin resizes the one tile. At each step
+  (`interactiveMoveResizeStepped`) the script sets the main share from
+  where KWin has that tile going and lays out the others, leaving the
+  dragged one to KWin until the button comes up. An edge dragged back to
+  where it began gives the part the share it had.
+- **Escape cancels the drag,** and the tiles go back. KWin says only that
+  a resize finished, cancelled or not, and a script can't read where KWin
+  has a window going. But each step asks the window for a geometry
+  (`frameGeometryAboutToChange`) and then says it stepped, and a cancel
+  asks it back to where it began and says it finished, with no step
+  (`Window::finishInteractiveMoveResize`). So an asking after the last
+  step is a cancel. An X11 window's resize goes another way
+  (`X11Window::doInteractiveResizeSync`), so its cancel ends as letting go
+  does *(unverified)*.
+
+**What differs from tide's standard, and why:**
+
+- **A tile's zone is outside the window only.** KWin's input region for a
+  decoration is its borders and what's outside them; inside the frame the
+  app takes the pointer. So with no shadow the zone is 4 px on the
+  neighbor's side of the edge, not 4 px either side.
+- **An unfocused tile's zone works only where nothing is above it.** Each
+  window has its own zone, and a neighbor higher in the stack covers it
+  with its surface. The focused tile is raised as it's activated, so its
+  zone is whole. With a focus policy that doesn't raise, such as focus
+  follows mouse, it may not be *(unverified)*.
+- **A window that draws its own decoration has no zone or shadow of
+  tide's.** KWin decorates only a window that asks for a server-side
+  decoration. A GTK app with its own header bar keeps its own shadow and
+  resize zone.
+- **The title bar stays** (TODO.md). tide's windows have none elsewhere.
+- **Settings come through `make setup`,** which copies `shadows`,
+  `shadowSize`, `borderWidth` and `roundedCorners` from tide's
+  `appearance.json` and `appearance.local.json` (tide §16) into `kwinrc`'s
+  `[tide-decoration]`. The decoration reads them as KWin starts and each
+  time it reconfigures (`DecorationSettings::reconfigured`). A change on
+  tide's Borders page reaches KWin at the next `make setup`.
+- **The border is dark or light by Plasma's colors,** the title bar's
+  lightness, not by tide's schedule.
+
+**Cost and reliability** of a compiled plugin:
+
+- **It builds on your machine.** It needs a C++ compiler, CMake,
+  extra-cmake-modules and the headers of Qt 6, KDecoration3, KCoreAddons
+  and KConfig (README.md). Releases carry no binary: one built for one
+  distro's Qt doesn't load in another's.
+- **It runs inside KWin.** A crash in it is a crash of the compositor.
+  A script can't do that.
+- **ABI.** It links `libkdecorations3.so.6`, whose version Plasma 6 has
+  kept. Qt checks a plugin's Qt version as it loads. One that won't load
+  is logged, and KWin uses Breeze (`DecorationBridge::init`). After a
+  Plasma or Qt upgrade that breaks it, `make install-decoration` builds it
+  again.
+- **Linux only.** KWin is.
+- **Install.** `make install-decoration` puts it in the user's own Qt
+  plugin directory and has Plasma's session add that to `QT_PLUGIN_PATH`
+  (`~/.config/plasma-workspace/env/tide-kde.sh`, which `startplasma`
+  sources: plasma-workspace's `runEnvironmentScripts`). A headless KWin
+  finds the plugin through `QT_PLUGIN_PATH`. That a real session's KWin,
+  which holds `CAP_SYS_NICE`, does too is *(unverified)*.
+- **Unseen.** No screen shows a headless KWin, and its screenshots need
+  OpenGL, which the container lacks. So the title bar, its buttons, the
+  shadow and the corners have been drawn but not looked at, nor the resize
+  cursor. X11 windows are untested.
+
 ## 5. `tide-kde.service`
 
 `tide-kde.service` stays tide's, running tide's Plasma launcher
@@ -283,9 +438,13 @@ binds `Meta+Space` to it.
   free of Hyprland's. `node --test` runs it here, against tide's layout
   numbers.
 - **tide.js** runs on a fake KWin (`src/fake_kwin.js`) for what a
-  headless KWin can't be made to do, such as a drag or moving the
-  pointer. It picks the next window as `activateNextWindow` does, and
-  can hold geometry until the app resizes, as KWin does.
+  headless KWin can't be made to do, such as a drag that moves a window.
+  It picks the next window as `activateNextWindow` does, and can hold
+  geometry until the app resizes, as KWin does.
+- **The decoration's rules** are `decoration/zones.h`, free of Qt: which
+  windows cast a shadow, each one's zone, the shadow's fade, and where the
+  pointer counts as being. `make test-zones` runs them with only a C++
+  compiler.
 - **Defaults.** `make check-tide-defaults`, in CI against a tide
   checkout, fails when a default tide on KDE restates drifts from tide's:
   the layouts' main shares and counts, the cycle, where a new window goes,
@@ -297,6 +456,13 @@ binds `Meta+Space` to it.
   KGlobalAccel's `invokeShortcut`, and reads what a probe script prints
   to KWin's log. CI runs it in Ubuntu's devel release, the one that
   packages KWin 6; Debian testing has no `kwin-wayland` package now.
+  - The pointer is the tests' own, `tests/kwin/pointer.c`, over KWin's
+    fake input protocol (`org_kde_kwin_fake_input`), which KWin gives any
+    client with `KWIN_WAYLAND_NO_PERMISSION_CHECKS=1`. It moves, presses
+    and drags: a window's shadow, a tile's edge.
+  - The decoration is built and loaded through `QT_PLUGIN_PATH`. The tests
+    read its zones over D-Bus, drag them with the pointer, and install it
+    as `make install-decoration` and `make setup` do.
   - A container can't grant `kwin_wayland` its `CAP_SYS_NICE`, so the
     kernel won't run it there. A copy without the capability runs, if it
     keeps its name: KWin's own platform plugin checks it.
@@ -315,6 +481,10 @@ binds `Meta+Space` to it.
   API (`src/scripting/`), `src/window.h`, `src/workspace.cpp`,
   `src/options.h`, `src/effect/effecthandler.h` and Dim Inactive
   (`src/plugins/diminactive/`).
+- KWin's `src/window.cpp`, `src/input.cpp`, `src/activation.cpp`,
+  `src/decorations/decorationbridge.cpp` and `src/wayland_server.cpp`, and
+  KDecoration 6.7.5's `src/decoration.cpp`: the decoration's input region,
+  sides and corners, fallback and fake input (§4.8, §6).
 - Ubuntu devel's `kwin-wayland` and `libkwin6` packages: `strings` over
   `libkwin.so.6` and `kwin_diminactive_config.so`, and `kwin_wayland
   --help`.
@@ -324,6 +494,6 @@ binds `Meta+Space` to it.
   `src/globalshortcut.cpp`: two shortcuts on one key (§4.5).
 - kscreenlocker's `UnlockApp::setShell` (§4.7).
 - plasma-workspace's and plasma-desktop's source: the keys Plasma binds
-  (§4.5).
-- tide for Linux's `SPEC.md`: §3.1, §5.5, §6 (§6.1 to §6.7), §8 and
+  (§4.5), and `startkde/startplasma.cpp`'s environment scripts (§4.8).
+- tide for Linux's `SPEC.md`: §3.1, §5.5, §6 (§6.1 to §6.7), §6.6's drag to resize, §8 and
   §8.5, §9, §10, §11, §13, §14 and §14.1, §15, §16.

@@ -187,6 +187,78 @@ test("letting go takes where KWin last had the window going, not its frame", () 
   assert.deepEqual([box(a), box(b)], [[0, 0, 1200, 1080], [1200, 0, 720, 1080]]);
 });
 
+// What tide's decoration was told of each window, by id, in the end
+function edgesTold(env) {
+  const told = new Map();
+  for (const c of env.calls) if (c[1] === "/org/tide/Decoration" && c[3] === "setEdges") told.set(c[4], c[5]);
+  return told;
+}
+
+test("the decoration hears which sides of each tile drag", () => {
+  const { ws, env } = start();
+  const a = ws.open();
+  // A lone window as wide as the monitor has none
+  assert.equal(edgesTold(env).get(a.internalId), 0);
+  const b = ws.open();
+  const c = ws.open();
+  // The master's right, and the stack's left
+  assert.deepEqual([a, b, c].map((w) => edgesTold(env).get(w.internalId)), [4, 2, 2]);
+  env.press("tide-next-layout");
+  // Three columns: both of the centered master's, and each stack's inner one
+  assert.deepEqual([a, b, c].map((w) => edgesTold(env).get(w.internalId)), [6, 2, 4]);
+  env.press("tide-monocle");
+  assert.deepEqual([a, b, c].map((w) => edgesTold(env).get(w.internalId)), [0, 0, 0]);
+});
+
+test("the decoration hears of a window that stops being a tile", () => {
+  const { ws, env } = start();
+  const a = ws.open();
+  const b = ws.open();
+  assert.equal(edgesTold(env).get(b.internalId), 2);
+  env.press("tide-float");
+  assert.equal(edgesTold(env).get(b.internalId), -1);
+  assert.equal(edgesTold(env).get(a.internalId), 0);
+  env.press("tide-float");
+  assert.equal(edgesTold(env).get(b.internalId), 2);
+  b.closeWindow();
+  assert.equal(edgesTold(env).get(b.internalId), -1);
+});
+
+test("the decoration hears of a lone window's sides when it isn't full width", () => {
+  const { ws, env } = start({ outputs: [{ name: "wide", x: 0, y: 0, width: 3440, height: 1440 }] });
+  const a = ws.open();
+  assert.equal(edgesTold(env).get(a.internalId), 6);
+});
+
+test("a decoration that starts later asks, and hears every tile's sides again", () => {
+  const { ws, env } = start();
+  const a = ws.open();
+  const b = ws.open();
+  // Said with no decoration to hear
+  assert.deepEqual([a, b].map((w) => edgesTold(env).get(w.internalId)), [4, 2]);
+  env.calls.length = 0;
+  env.press("tide-grow");
+  assert.equal(edgesTold(env).size, 0, "unchanged, so not said again");
+  // The decoration presses tide-announce as it starts
+  env.press("tide-announce");
+  assert.deepEqual([a, b].map((w) => edgesTold(env).get(w.internalId)), [4, 2]);
+});
+
+test("tide tells the decoration to forget what a tide before it said", () => {
+  const { env } = start();
+  const first = env.calls.find((c) => c[1] === "/org/tide/Decoration");
+  assert.deepEqual(first.slice(2), ["org.tide.Decoration", "reset"]);
+});
+
+test("the decoration isn't told again what it knows", () => {
+  const { ws, env } = start();
+  ws.open();
+  ws.open();
+  const before = env.calls.filter((c) => c[3] === "setEdges").length;
+  env.press("tide-grow");
+  assert.equal(env.calls.filter((c) => c[3] === "setEdges").length, before);
+});
+
 test("dragging a lone window's edge sets its width, centered", () => {
   const { ws } = start();
   const a = ws.open();
