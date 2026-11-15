@@ -46,6 +46,10 @@
   stays. `make setup` leaves `NextFocusPrefersMouse` off, as it would
   send a minimized dialog's focus to the window under the pointer rather
   than its parent.
+- Closing the window you're in (2026-11-15) focuses the window under the
+  pointer on any output, as tide §14.2's `focus_on_close cursor` does,
+  but not one wanting attention. With none, KWin's own pick stays, which
+  is the window used last on that output.
 
 - Going to the next window wanting attention (`tide-next-attention`,
   2026-11-15) takes the launcher's Attention windows (SPEC.md §4.6),

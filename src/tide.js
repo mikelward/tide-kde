@@ -311,7 +311,7 @@ export class Tide {
     const key = this.placed.get(id);
     this.placed.delete(id);
     this.floating.delete(id);
-    this.watched.delete(id);
+    const app = this.watched.delete(id);
     this.dragFrom.delete(id);
     this.boxes.delete(id);
     this.history = this.history.filter((x) => x !== id);
@@ -323,11 +323,12 @@ export class Tide {
     } else {
       this.updateDim();
     }
+    if (app) this.refocus(w, { sameOutput: false });
   }
 
   minimizedChanged(w) {
     this.place(w);
-    if (w.minimized) this.refocus(w);
+    if (w.minimized) this.refocus(w, { sameOutput: true });
   }
 
   windowsById() {
@@ -382,7 +383,7 @@ export class Tide {
     for (const key of new Set(this.placed.values())) this.relayout(key);
   }
 
-  // --- Focus after minimizing (SPEC.md §4.4) -----------------------------
+  // --- Focus after minimizing or closing (SPEC.md §4.4) -------------------
 
   // The current turn of KWin's event loop, begun if it hasn't been: it
   // ends once KWin is done with what it's doing (`later`).
@@ -426,19 +427,21 @@ export class Tide {
     return (this.tiled(w) && this.boxes.get(idOf(w))) || w.frameGeometry;
   }
 
-  // The window under the pointer once `gone` has left `output`: the
-  // topmost of that output's windows there, if it's an app's window that
-  // isn't waiting. With the pointer on another output, none.
+  // The window under the pointer once `gone` has left: the topmost there,
+  // if it's an app's window that isn't waiting. With `output`, the pointer
+  // must be on that output, and only its windows count.
   underPointer(gone, output) {
     const c = this.ws.cursorPos;
     if (!c) return null;
-    const at = this.ws.screenAt(c);
-    if (!at || at.name !== output.name) return null;
+    if (output) {
+      const at = this.ws.screenAt(c);
+      if (!at || at.name !== output.name) return null;
+    }
     const stack = this.ws.stackingOrder ?? [];
     for (let i = stack.length - 1; i >= 0; i--) {
       const w = stack[i];
       if (idOf(w) === idOf(gone) || !this.shown(w)) continue;
-      if (!w.output || w.output.name !== output.name) continue;
+      if (output && (!w.output || w.output.name !== output.name)) continue;
       if (!contains(this.where(w), c)) continue;
       return this.appWindow(w) && !this.waiting(w) ? w : null;
     }
@@ -456,15 +459,19 @@ export class Tide {
     return null;
   }
 
-  // Once `gone`, the window you were in, is minimized and tide has laid
-  // out again, focuses the window under the pointer on its output, or with
-  // none, the window you were in before there (tide SPEC.md §6.7). KWin
-  // has already focused its own pick, as the space was still empty.
-  refocus(gone) {
+  // Once `gone`, the window you were in, is minimized or closed and tide
+  // has laid out again, focuses the window under the pointer (tide SPEC.md
+  // §6.7, §14.2). KWin has already focused its own pick, as the space was
+  // still empty. After a minimize, only a window on `gone`'s output
+  // counts, and with none there, the window you were in before on it
+  // does; after a close, any output's, and with none, KWin's pick stays.
+  refocus(gone, { sameOutput }) {
     const turn = this.turn;
-    const output = gone.output;
-    if (!turn || !turn.lost || turn.lost.id !== idOf(gone) || !output) return;
-    const target = this.underPointer(gone, output) ?? this.usedBefore(gone, output, turn.lost.history);
+    if (!turn || !turn.lost || turn.lost.id !== idOf(gone)) return;
+    const output = sameOutput ? gone.output : null;
+    if (sameOutput && !output) return;
+    let target = this.underPointer(gone, output);
+    if (!target && sameOutput) target = this.usedBefore(gone, output, turn.lost.history);
     const picked = this.ws.activeWindow;
     if (!target || (picked && idOf(picked) === idOf(target))) return;
     this.ws.activeWindow = target;
