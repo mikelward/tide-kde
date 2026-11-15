@@ -56,6 +56,10 @@ export class Tide {
     // JSON, and the windows whose wanting it tide follows.
     this.attention = null;
     this.heeded = new Set();
+    // The windows wanting attention by id, newest last, for the
+    // next-attention key: KWin keeps an order of its own but gives a script
+    // none.
+    this.marks = [];
   }
 
   log(text) {
@@ -293,6 +297,7 @@ export class Tide {
     this.floating.delete(id);
     this.watched.delete(id);
     this.dragFrom.delete(id);
+    this.marks = this.marks.filter((m) => m !== id);
     if (this.heeded.delete(id)) this.announceAttention();
     if (key !== undefined) {
       layout.remove(this.parts.get(key), id);
@@ -361,8 +366,41 @@ export class Tide {
     const id = idOf(w);
     if (this.heeded.has(id)) return;
     this.heeded.add(id);
-    w.demandsAttentionChanged?.connect(() => this.announceAttention());
-    if (w.demandsAttention) this.announceAttention();
+    w.demandsAttentionChanged?.connect(() => this.attentionChanged(w));
+    if (w.demandsAttention) this.attentionChanged(w);
+  }
+
+  // Keeps the order for the next-attention key, then tells the launcher.
+  attentionChanged(w) {
+    const id = idOf(w);
+    const was = this.marks.includes(id);
+    if (w.demandsAttention && !w.deleted) {
+      if (!was) this.marks.push(id);
+    } else if (was) {
+      this.marks = this.marks.filter((m) => m !== id);
+    }
+    this.announceAttention();
+  }
+
+  // tide's next_attention: the window that wanted attention last, on any
+  // workspace, which it comes up with. Activating it clears its mark, as
+  // KWin's setActiveWindow does, so the next press goes to the next. With
+  // none, nothing.
+  nextAttention() {
+    const byId = this.windowsById();
+    let w = null;
+    while (this.marks.length && !w) {
+      const found = byId.get(this.marks.pop());
+      if (found && !found.deleted) w = found;
+    }
+    if (!w) return;
+    // KWin's own activation switches desktops only by its Activation
+    // desktop policy, which you can change, so tide shows the desktop.
+    const desktops = w.desktops ?? [];
+    if (desktops.length > 0 && !desktops.some((d) => d.id === this.ws.currentDesktop.id)) {
+      this.show({ name: desktops[0].name, desktop: desktops[0] });
+    }
+    this.ws.activeWindow = w;
   }
 
   // Tells tide's launcher, for its Attention tab, which windows want

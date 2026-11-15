@@ -65,6 +65,8 @@ export const KEYS = [
   { name: "tide-next-workspace", title: "Next workspace with a window", key: "Meta+PgDown", action: "stepWorkspace", arg: 1 },
   { name: "tide-move-previous-workspace", title: "Move the window to the previous workspace", key: "Meta+Shift+PgUp", action: "moveToStep", arg: -1 },
   { name: "tide-move-next-workspace", title: "Move the window to the next workspace", key: "Meta+Shift+PgDown", action: "moveToStep", arg: 1 },
+  // No key, as in tide: yours to give it in System Settings
+  { name: "tide-next-attention", title: "Go to the next window wanting attention", key: "", action: "nextAttention" },
   ...workspaceKeys(),
   // No key: the layout widget presses it as it loads, for the layouts now.
   { name: "tide-announce", title: "Tell the layout widget the layouts", key: "", action: "reannounce" },
