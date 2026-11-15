@@ -95,7 +95,9 @@ After `make install`, this sets Plasma up as tide has it:
   windows together;
 - sets KWin's focus stealing prevention to Medium, so a new window from
   another app opens behind the one you're in;
-- puts the layout widget on the first panel;
+- puts the layout widget just after the Pager, as tide's bar has it after
+  the workspaces, adding it to that panel if no panel has it;
+- has the panels' Pagers show the workspaces' names;
 - gives the lock screen the desktop's wallpaper, as it is then.
 
 `make uninstall` leaves these as they are, and there's no undo for them

@@ -81,10 +81,31 @@ export function lockWallpaper(image) {
   ];
 }
 
-// Puts the layout widget on the first panel, unless one has it.
+// Puts the layout widget on the panel with the Pager, or else the first,
+// unless one has it.
 export const WIDGET_SCRIPT =
   'if (!panels().some((p) => p.widgets("org.tide.layout").length > 0) && panels().length > 0)' +
-  ' panels()[0].addWidget("org.tide.layout");';
+  ' (panels().find((p) => p.widgets("org.kde.plasma.pager").length > 0) || panels()[0])' +
+  '.addWidget("org.tide.layout");';
+
+// Moves the layout widget to just after the Pager, as tide's bar has the
+// layout symbol after the workspaces, or after the panel's first widget,
+// the launcher, with no Pager. A widget's index is its place in its panel,
+// which Plasma moves it to as it's set; a widget just added has none yet,
+// so this runs after WIDGET_SCRIPT, not with it.
+export const PLACE_SCRIPT =
+  'for (const p of panels()) for (const t of p.widgets("org.tide.layout")) {' +
+  ' const pager = p.widgets("org.kde.plasma.pager")[0];' +
+  ' const after = pager ? pager.index : 0;' +
+  ' const want = t.index >= 0 && t.index < after ? after : after + 1;' +
+  ' if (t.index !== want && want < p.widgets().length) t.index = want; }';
+
+// Has each of Plasma's Pagers show its desktops' names, tide's workspace
+// names, where it shows none by default (its displayedText: 0 numbers, 1
+// names, 2 nothing).
+export const PAGER_SCRIPT =
+  'for (const p of panels()) for (const w of p.widgets("org.kde.plasma.pager")) {' +
+  ' w.currentConfigGroup = ["General"]; w.writeConfig("displayedText", 1); }';
 
 // A KConfig list's items, as KConfig writes one: split on commas, with a
 // comma or backslash in an item escaped by a backslash.
@@ -218,6 +239,16 @@ function main() {
     run("qdbus6", ["org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript", WIDGET_SCRIPT]);
   } catch (e) {
     console.error(`couldn't put the layout widget on a panel (${e.stderr || e.message}); add "tide Layout" from Add Widgets`);
+  }
+  try {
+    run("qdbus6", ["org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript", PLACE_SCRIPT]);
+  } catch (e) {
+    console.error(`couldn't move the layout widget next to the Pager (${e.stderr || e.message}); drag it there in Edit Mode`);
+  }
+  try {
+    run("qdbus6", ["org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript", PAGER_SCRIPT]);
+  } catch (e) {
+    console.error(`couldn't have the Pager show the workspaces' names (${e.stderr || e.message}); set Text to "Desktop name" in Configure Pager`);
   }
   if (!batch) console.log("tide's keys take over from Plasma's at the next login.");
 }
