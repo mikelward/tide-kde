@@ -30,6 +30,7 @@ class SetupTest(KWinTest):
         before = self.keys()
         self.assertIn(ALT | TAB, before["Walk Through Windows"])
         self.assertIn(ALT | TAB, before["tide-zoom"])
+        self.assertEqual(before["tide-next-attention"], [], "listed with no key")
         self.stop()
         r = subprocess.run(["node", os.path.join(ROOT, "scripts", "setup.mjs")], env=self.env,
                            capture_output=True, text=True)
@@ -39,6 +40,7 @@ class SetupTest(KWinTest):
         self.assertEqual(after["tide-zoom"], [ALT | TAB])
         self.assertEqual(after["tide-focus-left"], [META | LEFT])
         self.assertEqual(after["tide-previous-workspace"], [META | PAGE_UP])
+        self.assertEqual(after["tide-next-attention"], [], "listed, to bind yourself")
         self.assertNotIn(ALT | TAB, after["Walk Through Windows"])
         self.assertIn(ALT | SHIFT | TAB, after["Walk Through Windows (Reverse)"], "what tide doesn't take stays")
         # And Dim Inactive's settings are in

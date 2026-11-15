@@ -40,6 +40,11 @@
 
 ## Decisions needing review
 
+- Going to the next window wanting attention (`tide-next-attention`,
+  2026-11-15) takes the launcher's Attention windows (SPEC.md §4.6),
+  newest first by when the script saw `demandsAttention` change. Windows
+  already wanting attention as tide starts count in KWin's window order,
+  as KWin gives a script no times.
 - The script's ID is `tide`, so its settings are kwinrc's `[Script-tide]`
   and it's `tideEnabled` under `[Plugins]`.
 - Standing workspaces are made at start and stay, even empty, so Plasma's

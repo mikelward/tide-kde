@@ -184,6 +184,68 @@ test("Super+End toggles between the last two workspaces other than home", () => 
   assert.equal(ws.currentDesktop.name, "oc");
 });
 
+// tide's next_attention (tide SPEC.md §6.6), on KWin's own urgency: the
+// window that wanted attention last, on any workspace.
+test("the next-attention key goes to the newest window wanting attention, with its workspace, and clears it", () => {
+  const { ws, env } = start();
+  const a = ws.open();
+  env.press("tide-go-2");
+  const b = ws.open();
+  env.press("tide-go-3");
+  const c = ws.open();
+  env.press("tide-home");
+  ws.activeWindow = a;
+  c.demandsAttention = true;
+  b.demandsAttention = true;
+  env.press("tide-next-attention");
+  assert.equal(ws.currentDesktop.name, "re");
+  assert.equal(ws.activeWindow, b);
+  assert.equal(b.demandsAttention, false);
+  env.press("tide-next-attention");
+  assert.equal(ws.currentDesktop.name, "oc", "the next press goes to the next");
+  assert.equal(ws.activeWindow, c);
+  // One that stops wanting it on its own is passed over
+  b.demandsAttention = true;
+  a.demandsAttention = true;
+  b.demandsAttention = false;
+  env.press("tide-next-attention");
+  assert.equal(ws.activeWindow, a);
+  assert.equal(ws.currentDesktop.name, "in");
+});
+
+test("a window wanting attention as tide starts counts, and a closed one doesn't", () => {
+  const ws = new FakeWorkspace();
+  const env = fakeEnv(ws);
+  const a = ws.open();
+  const b = ws.open();
+  a.demandsAttention = true;
+  new Tide(env).start();
+  const c = ws.open();
+  ws.activeWindow = b;
+  c.demandsAttention = true;
+  c.closeWindow();
+  env.press("tide-next-attention");
+  assert.equal(ws.activeWindow, a);
+});
+
+test("with nothing wanting attention, the next-attention key does nothing", () => {
+  const { ws, env } = start();
+  const a = ws.open();
+  env.press("tide-go-2");
+  ws.open();
+  env.press("tide-home");
+  ws.activeWindow = a;
+  env.press("tide-next-attention");
+  assert.equal(ws.currentDesktop.name, "in", "not the last workspace");
+  assert.equal(ws.activeWindow, a, "nor the last window");
+});
+
+test("the next-attention key has no default key, as restore", () => {
+  const k = KEYS.find((x) => x.name === "tide-next-attention");
+  assert.equal(k?.title, "Go to the next window wanting attention");
+  assert.equal(k.key, "");
+});
+
 test("a made desktop with a window stays when left", () => {
   const { ws, env } = start();
   ws.createDesktop(ws.desktops.length, "work");

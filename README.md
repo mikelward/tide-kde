@@ -64,8 +64,9 @@ a pinned window too (SPEC.md §4.5).
 
 They're KWin global shortcuts, under "KWin" in System Settings →
 Keyboard → Shortcuts, each starting `tide:`, where you can change them.
-The layout used last and restore are there with no key, as in tide for
-Linux. tide's other keys, such as the picker or lock, are Plasma's own
+The layout used last, restore and going to the next window wanting
+attention are there with no key, as in tide for Linux; `make setup`
+leaves them unbound. tide's other keys, such as the picker or lock, are Plasma's own
 here, or have none.
 
 Plasma holds some of these keys too: `Alt+Tab` and `Meta+Tab` (the task

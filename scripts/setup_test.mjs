@@ -65,6 +65,14 @@ test("tide's keys are bound, but one you bound yourself stays", () => {
   assert.equal(bound.length, KEYS.filter((k) => k.key).length - 1);
 });
 
+test("a key with no default, such as going to the next window wanting attention, isn't bound", () => {
+  const w = writes();
+  assert.ok(!w.has("kglobalshortcutsrc kwin tide-next-attention"));
+  assert.ok(!w.has("kglobalshortcutsrc kwin tide-restore"));
+  const mine = writes({ "kglobalshortcutsrc kwin tide-next-attention": "Meta+U,none,tide: Go to the next window wanting attention" });
+  assert.ok(!mine.has("kglobalshortcutsrc kwin tide-next-attention"), "one you gave it stays");
+});
+
 test("a key on its default from before tide's moves to tide's, but one you changed stays", () => {
   const w = writes({
     "kglobalshortcutsrc kwin tide-maximize": "Meta+Up,none,tide: Maximize the window",

@@ -146,6 +146,7 @@ Status: **yes**, **partial**, **no**, or **differs** (done another way).
 |---|---|---|
 | New windows from other apps don't take focus | partial | KWin's focus stealing prevention at Medium, which `make setup` sets, covers most of tide §14.1: a new window from the app you're in takes focus, one from another app doesn't. tide's rules for launches, terminals and polkit aren't KWin's |
 | Mark such a window urgent | yes | KWin does it with the prevention on *(unverified)* |
+| Go to the next window wanting attention (`next_attention`) | yes | The `tide-next-attention` shortcut, with no key, as in tide for Linux. The windows are the launcher's Attention tab's, from the script's one follower of `demandsAttention` (§4.6). KWin keeps their order (`Workspace::attention_chain`) but gives a script none, so that follower also notes it, newest last. A press shows the newest one's desktop and activates it; KWin clears its mark as it does (`Workspace::setActiveWindow`). With none, nothing. tide shows the desktop itself, as KWin's activation switches desktops only by its Activation desktop policy |
 | A launch from tide's launcher takes focus | partial | KWin trusts an activation token *(unverified)*; the launcher passes one if Quickshell does |
 
 ### 4.5 Keys (tide §6.6)

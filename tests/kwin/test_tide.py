@@ -184,6 +184,29 @@ class WorkspaceTest(KWinTest):
         self.assertEqual(s["current"], "re")
 
 
+class AttentionTest(KWinTest):
+    def test_next_attention_goes_to_the_newest_mark_with_its_workspace(self):
+        self.key("tide-go-2")
+        self.open("one")
+        self.key("tide-go-3")
+        self.open("two")
+        self.key("tide-home")
+        self.open("zero")
+        s = self.key("probe-attention")
+        self.assertTrue(s["windows"]["one"]["attention"] and s["windows"]["two"]["attention"], s)
+        s = self.key("tide-next-attention")
+        self.assertEqual(s["current"], "oc", s)
+        self.assertTrue(s["windows"]["two"]["active"], s)
+        self.assertFalse(s["windows"]["two"]["attention"], "going there clears it")
+        s = self.key("tide-next-attention")
+        self.assertEqual(s["current"], "re", s)
+        self.assertTrue(s["windows"]["one"]["active"], s)
+        # With nothing left, nothing happens
+        s = self.key("tide-next-attention")
+        self.assertEqual(s["current"], "re", s)
+        self.assertTrue(s["windows"]["one"]["active"], s)
+
+
 class TwoMonitorTest(KWinTest):
     """Two 1920x1080 monitors side by side"""
     OUTPUTS = 2

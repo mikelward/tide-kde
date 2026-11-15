@@ -119,11 +119,21 @@ export class FakeWorkspace {
     for (const name of desktops) this.desktops.push(this.newDesktop(name));
     this._current = this.desktops[0];
     this.windows = [];
-    this.activeWindow = null;
+    this._active = null;
     this.cursorPos = { x: 0, y: 0 };
     this._activity = "a1";
     for (const s of ["windowAdded", "windowRemoved", "currentDesktopChanged", "screensChanged", "desktopsChanged",
       "virtualScreenGeometryChanged", "currentActivityChanged"]) this[s] = new Signal();
+  }
+  get activeWindow() {
+    return this._active;
+  }
+  // As KWin's Workspace::setActiveWindow: a window activated no longer
+  // wants attention. KWin's activateWindow would also switch desktops, by
+  // a policy you can change; this leaves that to tide.
+  set activeWindow(w) {
+    if (w?.demandsAttention) w.demandsAttention = false;
+    this._active = w;
   }
   newDesktop(name) {
     return { id: `d${this.nextDesktop++}`, name };
