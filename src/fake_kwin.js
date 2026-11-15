@@ -1,6 +1,7 @@
 // A stand-in for what KWin's script engine gives a script, enough for
 // tide.js's tests: signals, windows, desktops, outputs and shortcuts. It
-// sets geometry at once, where KWin waits for the app; harness.py's tests
+// sets geometry at once, where KWin waits for the app to resize, unless
+// made with `lag`, where geometry set waits for `ack`. harness.py's tests
 // run the same script in a real KWin.
 
 export class Signal {
@@ -48,12 +49,23 @@ export class FakeWindow {
     this.resize = false;
     this._desktops = [ws.currentDesktop];
     this.output = ws.activeScreen;
-    this.frameGeometry = { x: 100, y: 100, width: 400, height: 300 };
+    this._frame = { x: 100, y: 100, width: 400, height: 300 };
+    this.requested = null;
     this.closed = false;
     for (const s of ["desktopsChanged", "outputChanged", "minimizedChanged", "fullScreenChanged", "maximizedChanged",
       "activitiesChanged", "frameGeometryChanged", "demandsAttentionChanged",
       "interactiveMoveResizeStarted", "interactiveMoveResizeFinished"]) this[s] = new Signal();
     Object.assign(this, props);
+    if (props.frameGeometry) this._frame = props.frameGeometry;
+  }
+  // As KWin's XdgSurfaceWindow::moveResizeInternal: a resize is asked of
+  // the app, and the frame changes only once it's done, here at `ack`.
+  get frameGeometry() {
+    return this._frame;
+  }
+  set frameGeometry(v) {
+    if (this.ws.lag) this.requested = v;
+    else this._frame = v;
   }
   get desktops() {
     return this._desktops;
@@ -72,8 +84,12 @@ export class FakeWindow {
   get minimized() {
     return this._minimized;
   }
+  // As KWin's Window::setMinimized: the window you're in gives focus to
+  // KWin's pick (XdgToplevelWindow::doMinimize) before minimizedChanged.
   set minimized(v) {
+    if (v === this._minimized) return;
     this._minimized = v;
+    if (v) this.ws.activateNext(this);
     this.minimizedChanged.emit();
   }
   get fullScreen() {
@@ -111,7 +127,8 @@ export class FakeWindow {
 }
 
 export class FakeWorkspace {
-  constructor({ outputs = [{ name: "out-1", x: 0, y: 0, width: 1920, height: 1080 }], desktops = ["Desktop 1"] } = {}) {
+  constructor({ outputs = [{ name: "out-1", x: 0, y: 0, width: 1920, height: 1080 }], desktops = ["Desktop 1"], lag = false } = {}) {
+    this.lag = lag;
     this.screens = outputs.map((o) => ({ name: o.name, geometry: { x: o.x, y: o.y, width: o.width, height: o.height } }));
     this.activeScreen = this.screens[0];
     this.desktops = [];
@@ -120,20 +137,77 @@ export class FakeWorkspace {
     this._current = this.desktops[0];
     this.windows = [];
     this._active = null;
+    // KWin's stacking order, bottom first, and its focus chain, latest
+    // first.
+    this.stack = [];
+    this.chain = [];
     this.cursorPos = { x: 0, y: 0 };
     this._activity = "a1";
     for (const s of ["windowAdded", "windowRemoved", "currentDesktopChanged", "screensChanged", "desktopsChanged",
-      "virtualScreenGeometryChanged", "currentActivityChanged"]) this[s] = new Signal();
+      "virtualScreenGeometryChanged", "currentActivityChanged", "windowActivated"]) this[s] = new Signal();
   }
   get activeWindow() {
     return this._active;
   }
-  // As KWin's Workspace::setActiveWindow: a window activated no longer
-  // wants attention. KWin's activateWindow would also switch desktops, by
-  // a policy you can change; this leaves that to tide.
+  // As the script's setter, KWin's Workspace::activateWindow: raises the
+  // window and activates it. It would also switch desktops, by a policy
+  // you can change; this leaves that to tide.
   set activeWindow(w) {
-    if (w?.demandsAttention) w.demandsAttention = false;
+    if (w) this.raise(w);
+    this.focus(w);
+  }
+  // As KWin's Workspace::setActiveWindow: the window heads the focus
+  // chain and no longer wants attention, which it says before
+  // windowActivated.
+  focus(w) {
+    if (w === this._active) return;
     this._active = w;
+    if (w) {
+      this.chain = [w, ...this.chain.filter((x) => x !== w)];
+      if (w.demandsAttention) w.demandsAttention = false;
+    }
+    this.windowActivated.emit(w);
+  }
+  raise(w) {
+    this.stack = [...this.stack.filter((x) => x !== w), w];
+  }
+  get stackingOrder() {
+    return this.stack.filter((w) => this.windows.includes(w));
+  }
+  // Whether `w` shows on the current desktop and activity.
+  shown(w) {
+    const desktops = w.desktops ?? [];
+    const activities = w.activities ?? [];
+    return !w.deleted && !w.minimized && (desktops.length === 0 || desktops.includes(this._current)) &&
+      (activities.length === 0 || activities.includes(this._activity));
+  }
+  // As KWin's Workspace::activateNextWindow, with its defaults
+  // (NextFocusPrefersMouse false, SeparateScreenFocus true): if `gone` is
+  // active, focus goes to its leader, or else the latest in the focus
+  // chain that shows and reaches onto its output (FocusChain::
+  // nextForDesktop), or else nothing. It doesn't raise but for a leader.
+  activateNext(gone) {
+    if (this._active !== gone) return;
+    const g = gone.output.geometry;
+    const reaches = (w) => {
+      const f = w.frameGeometry;
+      return f.x < g.x + g.width && f.x + f.width > g.x && f.y < g.y + g.height && f.y + f.height > g.y;
+    };
+    const usable = (w) => w !== gone && this.windows.includes(w) && this.shown(w) && reaches(w);
+    const leader = gone.transient ? gone.transientFor : null;
+    if (leader && usable(leader)) {
+      this.raise(leader);
+      this.focus(leader);
+      return;
+    }
+    this.focus(this.chain.find(usable) ?? null);
+  }
+  // The geometry the apps were asked for, as they've resized.
+  ack() {
+    for (const w of this.windows) {
+      if (w.requested) w._frame = w.requested;
+      w.requested = null;
+    }
   }
   newDesktop(name) {
     return { id: `d${this.nextDesktop++}`, name };
@@ -204,16 +278,20 @@ export class FakeWorkspace {
   open(props = {}) {
     const w = new FakeWindow(this, props);
     this.windows.push(w);
+    this.stack.push(w);
     this.windowAdded.emit(w);
     this.activeWindow = w;
     return w;
   }
+  // As KWin's Workspace::removeWaylandWindow: the window you're in gives
+  // focus to KWin's pick before windowRemoved.
   close(w) {
     // As KWin's own, a panel's room is still taken as it says it's gone
     if (w.dock) this.windowRemoved.emit(w);
+    this.activateNext(w);
     this.windows = this.windows.filter((x) => x !== w);
+    this.chain = this.chain.filter((x) => x !== w);
     w.deleted = true;
-    if (this.activeWindow === w) this.activeWindow = this.windows.at(-1) ?? null;
     if (!w.dock) this.windowRemoved.emit(w);
   }
 }

@@ -25,6 +25,10 @@ function box(r) {
   return { x: r.x, y: r.y, w: r.width, h: r.height };
 }
 
+function contains(r, p) {
+  return p.x >= r.x && p.x < r.x + r.width && p.y >= r.y && p.y < r.y + r.height;
+}
+
 export class Tide {
   constructor(env) {
     this.env = env;
@@ -60,6 +64,16 @@ export class Tide {
     // next-attention key: KWin keeps an order of its own but gives a script
     // none.
     this.marks = [];
+    // Where tide put each tiled window, by id: KWin's frameGeometry
+    // follows only once the app has resized.
+    this.boxes = new Map();
+    // The windows activated, by id, latest first, and the active one.
+    this.history = [];
+    this.current = null;
+    // What happened in this turn of KWin's event loop: the window that lost
+    // activation first, with the history as it was, and the windows KWin's
+    // activation cleared the mark of. Null between turns.
+    this.turn = null;
   }
 
   log(text) {
@@ -115,7 +129,9 @@ export class Tide {
     for (const k of KEYS) {
       this.env.registerShortcut(k.name, `tide: ${k.title}`, k.key, () => this.run(k));
     }
-    this.ws.windowActivated?.connect(() => this.updateDim());
+    this.current = this.ws.activeWindow ? idOf(this.ws.activeWindow) : null;
+    if (this.current !== null) this.history = [this.current];
+    this.ws.windowActivated?.connect((w) => this.activated(w));
     this.ws.currentDesktopChanged.connect(() => this.announce());
     this.relayoutAll();
     this.updateDim();
@@ -220,7 +236,7 @@ export class Tide {
       const again = () => this.place(w);
       w.desktopsChanged?.connect(again);
       w.outputChanged?.connect(again);
-      w.minimizedChanged?.connect(again);
+      w.minimizedChanged?.connect(() => this.minimizedChanged(w));
       w.fullScreenChanged?.connect(again);
       w.maximizedChanged?.connect(again);
       w.activitiesChanged?.connect(again);
@@ -297,6 +313,8 @@ export class Tide {
     this.floating.delete(id);
     this.watched.delete(id);
     this.dragFrom.delete(id);
+    this.boxes.delete(id);
+    this.history = this.history.filter((x) => x !== id);
     this.marks = this.marks.filter((m) => m !== id);
     if (this.heeded.delete(id)) this.announceAttention();
     if (key !== undefined) {
@@ -305,6 +323,11 @@ export class Tide {
     } else {
       this.updateDim();
     }
+  }
+
+  minimizedChanged(w) {
+    this.place(w);
+    if (w.minimized) this.refocus(w);
   }
 
   windowsById() {
@@ -350,12 +373,103 @@ export class Tide {
     for (const w of windows) {
       const b = boxes.get(idOf(w));
       const want = { x: b.x, y: b.y, width: b.w, height: b.h };
+      this.boxes.set(idOf(w), want);
       if (!sameBox(w.frameGeometry, want)) w.frameGeometry = want;
     }
   }
 
   relayoutAll() {
     for (const key of new Set(this.placed.values())) this.relayout(key);
+  }
+
+  // --- Focus after minimizing (SPEC.md §4.4) -----------------------------
+
+  // The current turn of KWin's event loop, begun if it hasn't been: it
+  // ends once KWin is done with what it's doing (`later`).
+  thisTurn() {
+    if (!this.turn) {
+      this.turn = { lost: null, cleared: new Set() };
+      this.env.later(() => {
+        this.turn = null;
+      });
+    }
+    return this.turn;
+  }
+
+  activated(w) {
+    const id = w ? idOf(w) : null;
+    const turn = this.thisTurn();
+    if (this.current !== null && this.current !== id && !turn.lost) {
+      turn.lost = { id: this.current, history: this.history };
+    }
+    this.current = id;
+    if (w && this.appWindow(w)) this.history = [id].concat(this.history.filter((x) => x !== id));
+    this.updateDim();
+  }
+
+  // Whether `w` shows: not minimized or hidden, on this desktop and
+  // activity.
+  shown(w) {
+    if (w.deleted || w.minimized || w.hidden || !this.onActivity(w)) return false;
+    const desktops = w.desktops ?? [];
+    return desktops.length === 0 || desktops.some((d) => d.id === this.ws.currentDesktop.id);
+  }
+
+  // Whether `w` wants attention, or did until KWin activated it in this
+  // turn: tide keeps such a window waiting (tide SPEC.md §14).
+  waiting(w) {
+    return !!w.demandsAttention || (this.turn !== null && this.turn.cleared.has(idOf(w)));
+  }
+
+  // Where `w` is, or for a tile, where tide has put it.
+  where(w) {
+    return (this.tiled(w) && this.boxes.get(idOf(w))) || w.frameGeometry;
+  }
+
+  // The window under the pointer once `gone` has left `output`: the
+  // topmost of that output's windows there, if it's an app's window that
+  // isn't waiting. With the pointer on another output, none.
+  underPointer(gone, output) {
+    const c = this.ws.cursorPos;
+    if (!c) return null;
+    const at = this.ws.screenAt(c);
+    if (!at || at.name !== output.name) return null;
+    const stack = this.ws.stackingOrder ?? [];
+    for (let i = stack.length - 1; i >= 0; i--) {
+      const w = stack[i];
+      if (idOf(w) === idOf(gone) || !this.shown(w)) continue;
+      if (!w.output || w.output.name !== output.name) continue;
+      if (!contains(this.where(w), c)) continue;
+      return this.appWindow(w) && !this.waiting(w) ? w : null;
+    }
+    return null;
+  }
+
+  // The window you were in before `gone` on `output`, from `history`.
+  usedBefore(gone, output, history) {
+    const byId = this.windowsById();
+    for (const id of history) {
+      const w = byId.get(id);
+      if (!w || id === idOf(gone) || !this.appWindow(w) || !this.shown(w) || this.waiting(w)) continue;
+      if (w.output && w.output.name === output.name) return w;
+    }
+    return null;
+  }
+
+  // Once `gone`, the window you were in, is minimized and tide has laid
+  // out again, focuses the window under the pointer on its output, or with
+  // none, the window you were in before there (tide SPEC.md §6.7). KWin
+  // has already focused its own pick, as the space was still empty.
+  refocus(gone) {
+    const turn = this.turn;
+    const output = gone.output;
+    if (!turn || !turn.lost || turn.lost.id !== idOf(gone) || !output) return;
+    const target = this.underPointer(gone, output) ?? this.usedBefore(gone, output, turn.lost.history);
+    const picked = this.ws.activeWindow;
+    if (!target || (picked && idOf(picked) === idOf(target))) return;
+    this.ws.activeWindow = target;
+    // KWin's pick cleared its mark as it activated it
+    if (picked && !picked.deleted && turn.cleared.has(idOf(picked))) picked.demandsAttention = true;
   }
 
   // --- Attention (SPEC.md §4.6) -------------------------------------------
@@ -379,6 +493,9 @@ export class Tide {
     } else if (was) {
       this.marks = this.marks.filter((m) => m !== id);
     }
+    // KWin's setActiveWindow clears it just after making `w` active
+    const active = this.ws.activeWindow;
+    if (!w.demandsAttention && active && idOf(active) === id) this.thisTurn().cleared.add(id);
     this.announceAttention();
   }
 
