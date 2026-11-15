@@ -744,3 +744,61 @@ test("a minimized dialog gives focus to its parent, as KWin does", () => {
   assert.ok(d.minimized);
   assert.equal(ws.activeWindow, p);
 });
+
+test("closing the window you're in focuses the one that tiles in under the pointer", () => {
+  const { ws, env } = start({ lag: true });
+  const a = ws.open();
+  const b = ws.open();
+  ws.open();
+  ws.activeWindow = a;
+  ws.ack();
+  env.settle();
+  ws.cursorPos = { x: 500, y: 500 };
+  env.press("tide-close");
+  assert.ok(a.deleted);
+  assert.equal(ws.activeWindow, b, "b took the master's place, under the pointer");
+});
+
+test("closing the window you're in focuses the window under the pointer on another monitor", () => {
+  const { ws, env } = start({ outputs: TWO, lag: true });
+  ws.open();
+  const g = ws.open();
+  ws.activeScreen = ws.screens[1];
+  const c = ws.open();
+  ws.activeWindow = g;
+  ws.ack();
+  env.settle();
+  ws.cursorPos = { x: 3000, y: 500 };
+  env.press("tide-close");
+  assert.equal(ws.activeWindow, c);
+});
+
+test("closing with the pointer over a window wanting attention leaves KWin's pick", () => {
+  const { ws, env } = start({ lag: true });
+  const a = ws.open();
+  const b = ws.open();
+  const c = ws.open();
+  ws.activeWindow = a;
+  b.demandsAttention = true;
+  ws.ack();
+  env.settle();
+  ws.cursorPos = { x: 500, y: 500 };
+  env.press("tide-close");
+  assert.equal(ws.activeWindow, c);
+  assert.equal(b.demandsAttention, true);
+});
+
+test("closing a window you aren't in moves no focus", () => {
+  const { ws, env } = start({ lag: true });
+  const a = ws.open();
+  ws.open();
+  const c = ws.open();
+  ws.activeWindow = a;
+  env.settle();
+  ws.activeWindow = c;
+  ws.ack();
+  env.settle();
+  ws.cursorPos = { x: 500, y: 500 };
+  a.closeWindow();
+  assert.equal(ws.activeWindow, c);
+});

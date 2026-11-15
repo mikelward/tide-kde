@@ -148,10 +148,11 @@ Status: **yes**, **partial**, **no**, or **differs** (done another way).
 | Mark such a window urgent | yes | KWin does it with the prevention on *(unverified)* |
 | Go to the next window wanting attention (`next_attention`) | yes | The `tide-next-attention` shortcut, with no key, as in tide for Linux. The windows are the launcher's Attention tab's, from the script's one follower of `demandsAttention` (§4.6). KWin keeps their order (`Workspace::attention_chain`) but gives a script none, so that follower also notes it, newest last. A press shows the newest one's desktop and activates it; KWin clears its mark as it does (`Workspace::setActiveWindow`). With none, nothing. tide shows the desktop itself, as KWin's activation switches desktops only by its Activation desktop policy |
 | Minimizing the window you're in focuses the window under the pointer (tide §6.7) | yes | See below |
+| Closing it does too (tide §14.2) | yes | See below |
 | A launch from tide's launcher takes focus | partial | KWin trusts an activation token *(unverified)*; the launcher passes one if Quickshell does |
 
-**Focus after a minimize.** KWin picks the next window itself, before
-the script hears. `XdgToplevelWindow::doMinimize` calls
+**Focus after a minimize or close.** KWin picks the next window itself,
+before the script hears. `XdgToplevelWindow::doMinimize` calls
 `Workspace::activateNextWindow`, and only then does `Window::setMinimized`
 emit `minimizedChanged`. So the spot under the pointer is still empty,
 and KWin falls back to its focus chain: the window used last that reaches
@@ -176,6 +177,11 @@ attention, or a floating one from the next output.
   window wanting attention, the script marks it again.
 - **A dialog** goes to its parent, as KWin's `activateNextWindow` sends
   it. The script leaves it.
+- **Closing the window you're in** has the same gap:
+  `Workspace::removeWaylandWindow` calls `activateNextWindow` before
+  `removeWindow` emits `windowRemoved`. So the script picks again there
+  too, by the same rule but on any output, as tide §14.2 has it. With
+  nothing to take, KWin's pick stays.
 - **`NextFocusPrefersMouse` stays off.** It makes KWin take the window
   under the pointer (`Workspace::windowUnderMouse`), but before the
   re-tile, so it can't find the one moving in. It also comes before a
