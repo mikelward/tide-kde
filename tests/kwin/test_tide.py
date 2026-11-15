@@ -125,6 +125,19 @@ class TileTest(KWinTest):
         self.assertTrue(s["windows"]["two"]["minimized"])
         self.settled({"one": (0, 0, 1920, 1080)})
 
+    def test_minimizing_the_master_focuses_the_window_that_tiles_in_under_the_pointer(self):
+        # KWin starts the pointer in the monitor's middle, over the master
+        # (PointerInputRedirection::init). Its own pick would be three, the
+        # window used before.
+        self.three()
+        self.settled({"one": (0, 0, 1056, 1080)})
+        s = self.key("tide-focus-down")
+        self.assertTrue(s["windows"]["one"]["active"], s)
+        s = self.key("tide-minimize")
+        self.assertTrue(s["windows"]["one"]["minimized"], s)
+        self.assertTrue(s["windows"]["two"]["active"], s)
+        self.settled({"two": (0, 0, 1056, 1080)})
+
 
 class UltrawideTest(KWinTest):
     """On a 3440x1440 monitor, past the ultrawide aspect of 2.1"""

@@ -315,10 +315,11 @@ test("the window keys act on a dialog and a fixed-size window", () => {
   env.press("tide-send-2");
   assert.equal(fixed.desktops[0].name, "re");
   const dialog = ws.open({ normalWindow: false, dialog: true, transient: true });
-  env.press("tide-minimize");
-  assert.ok(dialog.minimized);
   env.press("tide-close");
   assert.ok(dialog.deleted);
+  const other = ws.open({ normalWindow: false, dialog: true, transient: true });
+  env.press("tide-minimize");
+  assert.ok(other.minimized);
 });
 
 test("a window fullscreen as tide starts tiles once it isn't", () => {
@@ -599,4 +600,147 @@ test("a dialog wanting attention counts too", () => {
   const d = ws.open({ transient: true });
   d.demandsAttention = true;
   assert.deepEqual(attention(env), [d.internalId]);
+});
+
+// --- Focus after minimizing or closing (tide SPEC.md §6.7, §14.2) --------
+//
+// The fake decides as KWin does (activateNextWindow, with its defaults),
+// before tide hears and lays out again, and with `lag` the apps resize
+// only at `ack`, as they do after KWin has decided: so where a window will
+// be is where tide's layout puts it, not its frame yet.
+
+const TWO = [
+  { name: "left", x: 0, y: 0, width: 1920, height: 1080 },
+  { name: "right", x: 1920, y: 0, width: 1920, height: 1080 },
+];
+
+const FIXED = { minSize: { width: 400, height: 300 }, maxSize: { width: 400, height: 300 } };
+
+// A fixed-size window on the right monitor that reaches onto the left
+// one, at `y`: KWin's focus chain counts it for the left monitor
+// (FocusChain::isUsableFocusCandidate), tide doesn't.
+function overhang(ws, y = 100) {
+  ws.activeScreen = ws.screens[1];
+  const x = ws.open(Object.assign({ frameGeometry: { x: 1800, y, width: 400, height: 300 } }, FIXED));
+  ws.activeScreen = ws.screens[0];
+  return x;
+}
+
+test("minimizing the window you're in focuses the one that tiles in under the pointer", () => {
+  const { ws, env } = start({ lag: true });
+  const a = ws.open();
+  const b = ws.open();
+  ws.open();
+  ws.activeWindow = a;
+  ws.ack();
+  env.settle();
+  ws.cursorPos = { x: 500, y: 500 };
+  env.press("tide-minimize");
+  assert.ok(a.minimized);
+  assert.equal(ws.activeWindow, b, "b took the master's place, under the pointer");
+});
+
+test("minimizing with the pointer over a panel focuses the window used before on that monitor", () => {
+  const { ws, env } = start({ outputs: TWO, lag: true });
+  ws.open({ dock: true, normalWindow: false, frameGeometry: { x: 0, y: 1040, width: 1920, height: 40 } });
+  const a = ws.open();
+  const g = ws.open();
+  overhang(ws);
+  ws.activeWindow = g;
+  ws.ack();
+  env.settle();
+  ws.cursorPos = { x: 100, y: 1060 };
+  env.press("tide-minimize");
+  assert.equal(ws.activeWindow, a, "not KWin's pick from the other monitor");
+});
+
+test("minimizing with the pointer on another monitor focuses the window used before on this one", () => {
+  const { ws, env } = start({ outputs: TWO, lag: true });
+  const a = ws.open();
+  const g = ws.open();
+  ws.activeScreen = ws.screens[1];
+  ws.open();
+  overhang(ws);
+  ws.activeWindow = g;
+  ws.ack();
+  env.settle();
+  ws.cursorPos = { x: 3000, y: 900 };
+  env.press("tide-minimize");
+  assert.equal(ws.activeWindow, a, "not the window under the pointer there");
+});
+
+test("minimizing with the pointer where a floating window overhangs another monitor focuses the one used before", () => {
+  const { ws, env } = start({ outputs: TWO, lag: true });
+  // From the left monitor, reaching 180 px onto the right
+  const f = ws.open(Object.assign({ frameGeometry: { x: 1700, y: 100, width: 400, height: 300 } }, FIXED));
+  const a = ws.open();
+  const g = ws.open();
+  overhang(ws, 700);
+  ws.activeWindow = g;
+  ws.ack();
+  env.settle();
+  ws.cursorPos = { x: 2000, y: 200 };
+  env.press("tide-minimize");
+  assert.equal(f.output.name, "left");
+  assert.equal(ws.activeWindow, a, "not the floating window, whose part there is on the other monitor");
+});
+
+test("minimizing with the pointer where another monitor's window reaches over a tile focuses the tile", () => {
+  const { ws, env } = start({ outputs: TWO, lag: true });
+  const a = ws.open();
+  ws.open();
+  const c = ws.open();
+  overhang(ws);
+  ws.activeWindow = a;
+  ws.ack();
+  env.settle();
+  ws.cursorPos = { x: 1850, y: 200 };
+  env.press("tide-minimize");
+  assert.equal(ws.activeWindow, c, "the tile under the overhanging window, which is the other monitor's");
+});
+
+test("minimizing with the pointer over a window wanting attention leaves it waiting", () => {
+  const { ws, env } = start({ lag: true });
+  const a = ws.open();
+  const b = ws.open();
+  const c = ws.open();
+  ws.activeWindow = b;
+  ws.activeWindow = a;
+  b.demandsAttention = true;
+  ws.ack();
+  env.settle();
+  ws.cursorPos = { x: 500, y: 500 };
+  env.press("tide-minimize");
+  assert.equal(ws.activeWindow, c, "the window used before, past the one waiting");
+  assert.equal(b.demandsAttention, true, "KWin's own pick of it doesn't clear its mark");
+  assert.deepEqual(attention(env), [b.internalId]);
+});
+
+test("minimizing a window you aren't in moves no focus", () => {
+  const { ws, env } = start({ lag: true });
+  const a = ws.open();
+  ws.open();
+  const c = ws.open();
+  ws.activeWindow = a;
+  env.settle();
+  ws.activeWindow = c;
+  ws.ack();
+  env.settle();
+  ws.cursorPos = { x: 500, y: 500 };
+  // As a taskbar does
+  a.minimized = true;
+  assert.equal(ws.activeWindow, c);
+});
+
+test("a minimized dialog gives focus to its parent, as KWin does", () => {
+  const { ws, env } = start({ lag: true });
+  const p = ws.open();
+  ws.open();
+  const d = ws.open({ normalWindow: false, dialog: true, transient: true, transientFor: p });
+  ws.ack();
+  env.settle();
+  ws.cursorPos = { x: 1500, y: 500 };
+  env.press("tide-minimize");
+  assert.ok(d.minimized);
+  assert.equal(ws.activeWindow, p);
 });

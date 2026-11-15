@@ -65,7 +65,7 @@ What `tide.js` calls of KWin's script API (KWin's
 
 | Area | Names |
 |---|---|
-| Windows | `workspace.windowList`, `activeWindow`; a window's `frameGeometry`, `output`, `desktops`, `activities`, `minimized`, `fullScreen`, `maximizeMode`, `setMaximize`, `closeWindow`, and what kind it is (`normalWindow`, `dialog`, `dock`, `transient`, `minSize`, `maxSize` and more) |
+| Windows | `workspace.windowList`, `activeWindow`, `stackingOrder`; a window's `frameGeometry`, `output`, `desktops`, `activities`, `minimized`, `hidden`, `fullScreen`, `maximizeMode`, `setMaximize`, `closeWindow`, and what kind it is (`normalWindow`, `dialog`, `dock`, `transient`, `minSize`, `maxSize` and more) |
 | Window signals | `windowAdded`, `windowRemoved`, `windowActivated`; a window's `frameGeometryChanged`, `outputChanged`, `desktopsChanged`, `activitiesChanged`, `minimizedChanged`, `fullScreenChanged`, `maximizedChanged`, `interactiveMoveResizeStarted`, `interactiveMoveResizeFinished` |
 | Desktops | `desktops`, `currentDesktop`, `createDesktop`, `removeDesktop`; `desktopsChanged`, `currentDesktopChanged`; `currentActivity`, `currentActivityChanged` |
 | Screens | `screens`, `activeScreen`, `clientArea`, `screenAt`, `cursorPos`, `sendClientToScreen`; the slots `slotSwitchToLeftScreen`, `slotSwitchToRightScreen`, `slotSwitchToAboveScreen` and `slotSwitchToBelowScreen`; `screensChanged`, `virtualScreenGeometryChanged` |
@@ -147,7 +147,40 @@ Status: **yes**, **partial**, **no**, or **differs** (done another way).
 | New windows from other apps don't take focus | partial | KWin's focus stealing prevention at Medium, which `make setup` sets, covers most of tide §14.1: a new window from the app you're in takes focus, one from another app doesn't. tide's rules for launches, terminals and polkit aren't KWin's |
 | Mark such a window urgent | yes | KWin does it with the prevention on *(unverified)* |
 | Go to the next window wanting attention (`next_attention`) | yes | The `tide-next-attention` shortcut, with no key, as in tide for Linux. The windows are the launcher's Attention tab's, from the script's one follower of `demandsAttention` (§4.6). KWin keeps their order (`Workspace::attention_chain`) but gives a script none, so that follower also notes it, newest last. A press shows the newest one's desktop and activates it; KWin clears its mark as it does (`Workspace::setActiveWindow`). With none, nothing. tide shows the desktop itself, as KWin's activation switches desktops only by its Activation desktop policy |
+| Minimizing the window you're in focuses the window under the pointer (tide §6.7) | yes | See below |
 | A launch from tide's launcher takes focus | partial | KWin trusts an activation token *(unverified)*; the launcher passes one if Quickshell does |
+
+**Focus after a minimize.** KWin picks the next window itself, before
+the script hears. `XdgToplevelWindow::doMinimize` calls
+`Workspace::activateNextWindow`, and only then does `Window::setMinimized`
+emit `minimizedChanged`. So the spot under the pointer is still empty,
+and KWin falls back to its focus chain: the window used last that reaches
+onto the same output (`FocusChain::nextForDesktop`, with
+`SeparateScreenFocus` on by default). That may be a window wanting
+attention, or a floating one from the next output.
+
+- **The script picks again** once it has re-tiled. It takes the topmost
+  window under the pointer (`workspace.stackingOrder`, `cursorPos`),
+  judging each tile by where the script put it. KWin moves a window's
+  frame only once the app has resized
+  (`XdgSurfaceWindow::moveResizeInternal`).
+- **Otherwise, tide §6.7's fallback:** the window you were in before on
+  that output. KWin gives a script no such history, so the script keeps
+  its own from `windowActivated`.
+- **The window you were in** is the one that lost activation in the same
+  turn of KWin's event loop (`later` in `main.js`): `setActiveWindow`
+  emits `windowActivated` for KWin's pick synchronously, before
+  `minimizedChanged`. Minimizing another window moves no focus.
+- **KWin's pick keeps its mark.** Activating a window clears its
+  `demandsAttention` (`Workspace::setActiveWindow`), so if KWin picked a
+  window wanting attention, the script marks it again.
+- **A dialog** goes to its parent, as KWin's `activateNextWindow` sends
+  it. The script leaves it.
+- **`NextFocusPrefersMouse` stays off.** It makes KWin take the window
+  under the pointer (`Workspace::windowUnderMouse`), but before the
+  re-tile, so it can't find the one moving in. It also comes before a
+  dialog's parent in `activateNextWindow`, so a minimized dialog would
+  give focus to whatever is under the pointer.
 
 ### 4.5 Keys (tide §6.6)
 
@@ -244,7 +277,9 @@ binds `Meta+Space` to it.
   free of Hyprland's. `node --test` runs it here, against tide's layout
   numbers.
 - **tide.js** runs on a fake KWin (`src/fake_kwin.js`) for what a
-  headless KWin can't be made to do, such as a drag.
+  headless KWin can't be made to do, such as a drag or moving the
+  pointer. It picks the next window as `activateNextWindow` does, and
+  can hold geometry until the app resizes, as KWin does.
 - **Defaults.** `make check-tide-defaults`, in CI against a tide
   checkout, fails when a default tide on KDE restates drifts from tide's:
   the layouts' main shares and counts, the cycle, where a new window goes,

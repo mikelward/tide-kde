@@ -40,6 +40,13 @@
 
 ## Decisions needing review
 
+- Minimizing the window you're in (2026-11-15) focuses the window under
+  the pointer once the script has re-tiled, else the one you were in
+  before on that output (SPEC.md §4.4). With neither, KWin's own pick
+  stays. `make setup` leaves `NextFocusPrefersMouse` off, as it would
+  send a minimized dialog's focus to the window under the pointer rather
+  than its parent.
+
 - Going to the next window wanting attention (`tide-next-attention`,
   2026-11-15) takes the launcher's Attention windows (SPEC.md §4.6),
   newest first by when the script saw `demandsAttention` change. Windows
