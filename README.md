@@ -7,7 +7,8 @@ notifications, lock and settings stay its own.
 [SPEC.md](SPEC.md) says what KWin allows and how each of tide's features
 maps onto it; [TODO.md](TODO.md) is the plan. `Meta+Space` stays tide's
 launcher on Plasma, with its Workspaces and Windows tabs, from tide
-(SPEC.md §4.6, §5).
+(SPEC.md §4.6, §5), and its Attention tab, the windows wanting attention,
+which this script tells it.
 
 ## What it does
 

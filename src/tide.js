@@ -52,6 +52,10 @@ export class Tide {
     this.dimLoaded = null;
     // The layouts last written for the layout widget, as JSON.
     this.announced = null;
+    // The windows wanting attention as last written for tide's launcher, as
+    // JSON, and the windows whose wanting it tide follows.
+    this.attention = null;
+    this.heeded = new Set();
   }
 
   log(text) {
@@ -112,6 +116,9 @@ export class Tide {
     this.relayoutAll();
     this.updateDim();
     this.announce();
+    // What the last session left names windows gone with it. plasmashell
+    // may not be up yet to hear; the launcher only lists windows it finds.
+    this.announceAttention();
     this.log("started");
   }
 
@@ -201,6 +208,7 @@ export class Tide {
       this.panelAdded(w);
       return;
     }
+    this.heed(w);
     if (!this.candidate(w)) return;
     const id = idOf(w);
     if (!this.watched.has(id)) {
@@ -285,6 +293,7 @@ export class Tide {
     this.floating.delete(id);
     this.watched.delete(id);
     this.dragFrom.delete(id);
+    if (this.heeded.delete(id)) this.announceAttention();
     if (key !== undefined) {
       layout.remove(this.parts.get(key), id);
       this.relayout(key);
@@ -342,6 +351,38 @@ export class Tide {
 
   relayoutAll() {
     for (const key of new Set(this.placed.values())) this.relayout(key);
+  }
+
+  // --- Attention (SPEC.md §4.6) -------------------------------------------
+
+  // Follows whether `w` wants attention, as KWin marks a window its focus
+  // stealing prevention keeps from taking focus, or one that asks.
+  heed(w) {
+    const id = idOf(w);
+    if (this.heeded.has(id)) return;
+    this.heeded.add(id);
+    w.demandsAttentionChanged?.connect(() => this.announceAttention());
+    if (w.demandsAttention) this.announceAttention();
+  }
+
+  // Tells tide's launcher, for its Attention tab, which windows want
+  // attention, by the UUIDs KWin's D-Bus knows them by. A KWin script can't
+  // be asked, so it keeps them in the desktop's settings in plasmashell,
+  // group "tide", key "attention", which the launcher reads as it opens.
+  announceAttention() {
+    const ids = this.ws.windowList().filter((w) => !w.deleted && w.demandsAttention).map(idOf).sort();
+    const json = JSON.stringify(ids);
+    if (json === this.attention) return;
+    this.attention = json;
+    this.log(`${ids.length} window${ids.length === 1 ? "" : "s"} wanting attention`);
+    const script =
+      `for (const d of desktops()) { d.currentConfigGroup = ["tide"]; d.writeConfig("attention", ${JSON.stringify(json)}); }`;
+    try {
+      this.env.callDBus("org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell", "evaluateScript", script);
+    } catch (e) {
+      this.log(`couldn't tell the launcher which windows want attention (${e}), so its Attention tab may be out of date`);
+      this.attention = null;
+    }
   }
 
   // --- The layout widget (SPEC.md §4.7) -----------------------------------

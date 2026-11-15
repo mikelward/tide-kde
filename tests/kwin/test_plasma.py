@@ -3,6 +3,7 @@ KWin, fed by tide's script. plasmashell needs Plasma's desktop shell
 (Ubuntu's plasma-desktop); without it these skip, unless TIDE_PLASMA=1,
 as CI's plasma job sets, makes that a failure."""
 
+import json
 import os
 import shutil
 import subprocess
@@ -87,6 +88,27 @@ class PanelTest(PlasmaTest):
         self.qdbus("org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript",
                    'const p = new Panel; p.location = "bottom";')
         self.settled({"one": self.area(full)})
+
+
+@unittest.skipUnless(REQUIRED or shutil.which(PLASMASHELL), "no plasmashell")
+class AttentionTest(PlasmaTest):
+    def attention(self):
+        """What the desktop's settings say wants attention, for tide's launcher."""
+        text = self.qdbus("org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell.evaluateScript",
+                          'const d = desktops()[0]; d.currentConfigGroup = ["tide"];'
+                          ' print(d.readConfig("attention", "null"));')
+        return json.loads(text)
+
+    def test_the_launcher_can_read_which_windows_want_attention(self):
+        self.shows("[]=")
+        # KWin won't mark the active window, so another opens after it
+        self.open("attend")
+        self.open("one")
+        self.assertFalse(self.state()["windows"]["attend"]["active"])
+        mark = self.log.mark()
+        self.key("probe-attend")
+        self.log.wait(lambda l: "tide: 1 window wanting attention" in l, "tide saying one wants attention", since=mark)
+        self.assertEqual(self.attention(), [self.state()["windows"]["attend"]["id"]])
 
 
 @unittest.skipUnless(REQUIRED or shutil.which(PLASMASHELL), "no plasmashell")

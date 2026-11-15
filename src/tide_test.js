@@ -453,7 +453,7 @@ test("with dim false, tide leaves Dim Inactive alone", () => {
 });
 
 function announced(env) {
-  const calls = env.calls.filter((c) => c[3] === "evaluateScript");
+  const calls = env.calls.filter((c) => c[3] === "evaluateScript" && c[4].includes('writeConfig("layouts"'));
   if (calls.length === 0) return null;
   const m = /writeConfig\("layouts", ("(?:[^"\\]|\\.)*")\)/.exec(calls.at(-1)[4]);
   return JSON.parse(JSON.parse(m[1]));
@@ -503,4 +503,38 @@ test("tiles make room for a panel as it comes, changes and goes", () => {
   ws.close(panel);
   env.settle();
   assert.deepEqual(box(a), [0, 0, 1920, 1080]);
+});
+
+// What tide last told the launcher wants attention, from its calls.
+function attention(env) {
+  const calls = env.calls.filter((c) => c[3] === "evaluateScript" && c[4].includes('writeConfig("attention"'));
+  if (calls.length === 0) return undefined;
+  const m = /writeConfig\("attention", ("(?:[^"\\]|\\.)*")\)/.exec(calls.at(-1)[4]);
+  return JSON.parse(JSON.parse(m[1]));
+}
+
+test("the launcher hears which windows want attention, as they change", () => {
+  const { ws, env } = start();
+  assert.deepEqual(attention(env), [], "a session's start clears what the last one left");
+  const a = ws.open();
+  const b = ws.open();
+  const before = env.calls.length;
+  a.demandsAttention = true;
+  assert.deepEqual(attention(env), [a.internalId]);
+  b.demandsAttention = true;
+  assert.deepEqual(attention(env), [a.internalId, b.internalId].sort());
+  a.demandsAttention = false;
+  assert.deepEqual(attention(env), [b.internalId]);
+  ws.close(b);
+  assert.deepEqual(attention(env), []);
+  const writes = env.calls.slice(before).filter((c) => c[4].includes('"attention"')).length;
+  a.minimized = true;
+  assert.equal(env.calls.slice(before).filter((c) => c[4].includes('"attention"')).length, writes, "nothing changed, nothing written");
+});
+
+test("a dialog wanting attention counts too", () => {
+  const { ws, env } = start();
+  const d = ws.open({ transient: true });
+  d.demandsAttention = true;
+  assert.deepEqual(attention(env), [d.internalId]);
 });

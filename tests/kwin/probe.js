@@ -20,6 +20,7 @@ registerShortcut("probe-dump", "probe: dump the state", "", () => {
       output: w.output ? w.output.name : null,
       minimized: w.minimized,
       active: w === workspace.activeWindow,
+      id: String(w.internalId),
     };
   }
   print("probe: dump " + JSON.stringify({
@@ -31,5 +32,10 @@ registerShortcut("probe-dump", "probe: dump the state", "", () => {
     })(),
     windows,
   }));
+});
+// Marks the windows of class "attend" as wanting attention, as an app
+// asks or KWin's focus stealing prevention does.
+registerShortcut("probe-attend", "probe: mark attend's windows", "", () => {
+  for (const w of workspace.windowList()) if (w.resourceClass === "attend") w.demandsAttention = true;
 });
 print("probe: ready");

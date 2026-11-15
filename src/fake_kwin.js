@@ -32,6 +32,7 @@ export class FakeWindow {
     this.specialWindow = false;
     this.popupWindow = false;
     this.dock = false;
+    this._demandsAttention = false;
     this.skipTaskbar = false;
     this.moveable = true;
     this.resizeable = true;
@@ -50,7 +51,7 @@ export class FakeWindow {
     this.frameGeometry = { x: 100, y: 100, width: 400, height: 300 };
     this.closed = false;
     for (const s of ["desktopsChanged", "outputChanged", "minimizedChanged", "fullScreenChanged", "maximizedChanged",
-      "activitiesChanged", "frameGeometryChanged",
+      "activitiesChanged", "frameGeometryChanged", "demandsAttentionChanged",
       "interactiveMoveResizeStarted", "interactiveMoveResizeFinished"]) this[s] = new Signal();
     Object.assign(this, props);
   }
@@ -60,6 +61,13 @@ export class FakeWindow {
   set desktops(v) {
     this._desktops = v;
     this.desktopsChanged.emit();
+  }
+  get demandsAttention() {
+    return this._demandsAttention;
+  }
+  set demandsAttention(v) {
+    this._demandsAttention = v;
+    this.demandsAttentionChanged.emit();
   }
   get minimized() {
     return this._minimized;
