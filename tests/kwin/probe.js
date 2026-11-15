@@ -4,6 +4,8 @@ function watch(w) {
   if (!w.normalWindow) return;
   print("probe: added " + w.resourceClass);
   w.frameGeometryChanged.connect(() => print("probe: geometry " + w.resourceClass));
+  w.interactiveMoveResizeStarted.connect(() => print("probe: drag started " + w.resourceClass));
+  w.interactiveMoveResizeFinished.connect(() => print("probe: drag finished " + w.resourceClass));
 }
 workspace.windowAdded.connect(watch);
 registerShortcut("probe-dump", "probe: dump the state", "", () => {

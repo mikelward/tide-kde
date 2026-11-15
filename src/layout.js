@@ -190,6 +190,46 @@ export function arrange(part, area, ids, config = DEFAULTS) {
   return new Map(ids.map((id, i) => [id, boxes[i]]));
 }
 
+// What tide's decoration is told of a window that's no tile.
+export const FLOATING = -1;
+
+// A window's sides, as Qt::Edges numbers them, which tide's decoration
+// takes (decoration/zones.h).
+export const EDGES = { top: 1, left: 2, right: 4, bottom: 8 };
+
+// The sides of tiled window `i` of `n` that a drag moves, as EDGES added
+// up (tide SPEC.md §6.6): those on the edge between the masters and the
+// stack, either side of threecol's centered master, and a lone window's
+// when it isn't as wide as `area`. `box` is the window's own. A stack's
+// rows are equal and twocol's masters share their side, so there's no
+// edge between them; nor has monocle any.
+export function dragEdges(part, n, i, box, area) {
+  const { left, right } = EDGES;
+  if (n === 1) return box.w < area.w ? left | right : 0;
+  const o = part.opts[part.mode] || {};
+  if (part.mode === "tile") {
+    const m = geometry.clamp(o.nmaster ?? 1, 0, n);
+    if (m === 0 || m === n) return 0;
+    return i < m ? right : left;
+  }
+  if (part.mode === "threecol") {
+    const m = geometry.clamp(o.nmaster ?? 1, 1, n);
+    const s = n - m;
+    if (s === 0) return 0;
+    if (s === 1) return i < m ? right : left;
+    if (i < m) return left | right;
+    // The stack alternates right, left, right...
+    return (i - m) % 2 === 0 ? left : right;
+  }
+  if (part.mode === "twocol") {
+    const m = geometry.clamp(o.nmaster ?? 2, 1, n);
+    if (m === n) return 0;
+    if (i >= m) return left;
+    return i === m - 1 ? right : 0;
+  }
+  return 0;
+}
+
 // What the settings change on a part already made, as tide's reload does
 // (tide SPEC.md §16): it keeps its mode, and takes the new mfact and master
 // count, losing any it was given with the keys.

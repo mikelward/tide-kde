@@ -1,7 +1,9 @@
 // Sets Plasma up for tide (README.md's Setup): frees the Plasma shortcuts
 // tide's keys take and binds tide's, sets dimming and focus stealing
 // prevention, turns the script on, puts the layout widget on the first
-// panel, and gives the lock screen the desktop's wallpaper. `make setup` runs it; scripts' setup-kde can.
+// panel, and gives the lock screen the desktop's wallpaper. With tide's
+// decoration installed (`make install-decoration`), it chooses it and
+// gives it tide's Borders settings. `make setup` runs it; scripts' setup-kde can.
 //
 //   node scripts/setup.mjs [--dry-run] [--batch FILE]
 //
@@ -15,7 +17,9 @@
 // with no Plasma. Plasma reads its shortcuts as the session starts, so
 // they take effect at the next login.
 import { execFileSync } from "node:child_process";
-import { appendFileSync, realpathSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, realpathSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { KEYS } from "../src/keys.js";
 
@@ -64,6 +68,72 @@ export const KWINRC = [
   ["Effect-diminactive", "DimFullScreen", "false"],
   ["Windows", "FocusStealingPreventionLevel", "2"],
 ];
+
+// tide's Borders settings (tide SPEC.md §6.2), with tide's defaults, as
+// tide's shell/lib/appearance.mjs has them: which windows cast a shadow,
+// how far it reaches, how wide a border is, and whether corners are round.
+export const APPEARANCE = { shadows: "focused", shadowSize: 16, borderWidth: 0, roundedCorners: true };
+export const SHADOWS = ["none", "floating", "focused", "all"];
+export const SHADOW_SIZE_MAX = 32;
+export const BORDER_WIDTH_MAX = 16;
+
+// What's wrong with setting `key`'s value, or null.
+function appearanceError(key, v) {
+  switch (key) {
+    case "shadows":
+      return SHADOWS.includes(v) ? null : `shadows must be one of ${SHADOWS.map((m) => `"${m}"`).join(", ")}`;
+    case "shadowSize":
+      return Number.isInteger(v) && v >= 0 && v <= SHADOW_SIZE_MAX ? null : `shadowSize must be a whole number from 0 to ${SHADOW_SIZE_MAX}`;
+    case "borderWidth":
+      return Number.isInteger(v) && v >= 0 && v <= BORDER_WIDTH_MAX ? null : `borderWidth must be a whole number from 0 to ${BORDER_WIDTH_MAX}`;
+    case "roundedCorners":
+      return typeof v === "boolean" ? null : "roundedCorners must be true or false";
+    default:
+      return null;
+  }
+}
+
+// The Borders settings in effect, from the text of tide's appearance.json
+// and appearance.local.json, each null when there's no such file: the
+// local file's win, and tide's defaults stand for the rest. A file or a
+// setting that makes no sense is named in `errors`, and left out.
+export function appearance(files) {
+  const settings = { ...APPEARANCE };
+  const errors = [];
+  for (const [name, text] of files) {
+    if (text === null) continue;
+    let value;
+    try {
+      value = JSON.parse(text);
+    } catch (e) {
+      errors.push(`${name}: ${e.message}`);
+      continue;
+    }
+    if (value === null || typeof value !== "object" || Array.isArray(value)) {
+      errors.push(`${name}: expected an object of settings`);
+      continue;
+    }
+    for (const key of Object.keys(APPEARANCE)) {
+      if (value[key] === undefined) continue;
+      const error = appearanceError(key, value[key]);
+      if (error) errors.push(`${name}: ${error}`);
+      else settings[key] = value[key];
+    }
+  }
+  return { settings, errors };
+}
+
+// kwinrc's settings for tide's decoration (decoration/): KWin's choice of
+// it, and the Borders settings as it reads them.
+export function decorationSettings(settings) {
+  return [
+    ["org.kde.kdecoration2", "library", "org.tide.decoration"],
+    ["tide-decoration", "Shadows", settings.shadows],
+    ["tide-decoration", "ShadowSize", String(settings.shadowSize)],
+    ["tide-decoration", "BorderWidth", String(settings.borderWidth)],
+    ["tide-decoration", "RoundedCorners", String(settings.roundedCorners)],
+  ];
+}
 
 // Prints the first desktop's wallpaper, as Plasma's image wallpaper keeps
 // it, or nothing for another kind.
@@ -140,8 +210,10 @@ export function formatEntry({ active, default: def, name }) {
 }
 
 // The writes that set Plasma up, each {file, group, key, value}, given
-// read(file, group, key), which gives a value or null.
-export function plan(read) {
+// read(file, group, key), which gives a value or null. `decoration` is
+// tide's Borders settings when its decoration is installed, and null when
+// it isn't: KWin then keeps the decoration it has.
+export function plan(read, decoration = null) {
   const writes = [];
   for (const [group, entry, keys] of TAKEN) {
     const e = parseEntry(read("kglobalshortcutsrc", group, entry));
@@ -165,7 +237,7 @@ export function plan(read) {
       value: formatEntry({ active: keys, default: keys, name: `tide: ${k.title}` }),
     });
   }
-  for (const [group, key, value] of KWINRC) {
+  for (const [group, key, value] of KWINRC.concat(decoration ? decorationSettings(decoration) : [])) {
     if (read("kwinrc", group, key) !== value) writes.push({ file: "kwinrc", group, key, value });
   }
   return writes;
@@ -200,6 +272,26 @@ export function batchLines(writes) {
     .join("");
 }
 
+// Where tide's decoration is, if it's installed: under a Qt plugin
+// directory, the user's own, as `make install-decoration` has it, one
+// QT_PLUGIN_PATH names, or Qt's (`qtDirs`).
+export function decorationInstalled(env, home, qtDirs, exists) {
+  const dirs = [join(home, ".local", "lib", "qt6", "plugins")]
+    .concat((env.QT_PLUGIN_PATH ?? "").split(":").filter((d) => d !== ""))
+    .concat(qtDirs);
+  return dirs.some((d) => exists(join(d, "org.kde.kdecoration3", "org.tide.decoration.so")));
+}
+
+// The text of `path`, or null when there's no such file.
+function readText(path) {
+  try {
+    return readFileSync(path, "utf8");
+  } catch (e) {
+    if (e.code === "ENOENT") return null;
+    throw e;
+  }
+}
+
 function run(cmd, args) {
   return execFileSync(cmd, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 }
@@ -222,7 +314,24 @@ function main() {
   } catch (e) {
     console.error(`couldn't ask Plasma for the desktop's wallpaper (${e.stderr || e.message}), so the lock screen keeps its own`);
   }
-  const writes = plan(read).map((w) => ({ ...w, groups: [w.group] }));
+  // Qt's own plugin directory, for a decoration installed for everyone.
+  // Without qtpaths6 only the user's own is looked in.
+  let qtDirs = [];
+  try {
+    qtDirs = [run("qtpaths6", ["--plugin-dir"]).trim()].filter((d) => d !== "");
+  } catch (e) {
+    console.error(`couldn't ask Qt where its plugins are (${e.code ?? e.message}), so tide's decoration is looked for only in your own`);
+  }
+  let decoration = null;
+  if (decorationInstalled(process.env, homedir(), qtDirs, existsSync)) {
+    const dir = join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "tide");
+    const found = appearance(["appearance.json", "appearance.local.json"].map((f) => [f, readText(join(dir, f))]));
+    for (const e of found.errors) console.error(`${e}; using tide's default`);
+    decoration = found.settings;
+  } else {
+    console.log("tide's decoration isn't installed, so windows keep Plasma's: make install-decoration adds it (README.md).");
+  }
+  const writes = plan(read, decoration).map((w) => ({ ...w, groups: [w.group] }));
   writes.push(...lockWallpaper(image));
   for (const w of writes) {
     console.log(`${w.file} [${w.groups.join("][")}] ${w.key}=${w.value.replace(/\t/g, "\\t")}`);

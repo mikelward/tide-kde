@@ -46,6 +46,9 @@ export class Tide {
     this.recent = [];
     // A window's geometry as an interactive move or resize began, by id.
     this.dragFrom = new Map();
+    // The sides of each tile that a drag moves, by id, as tide's decoration
+    // was last told (SPEC.md §4.8).
+    this.edges = new Map();
     // Where a window moved by side lands in its new part, by id: the way it
     // went and the box it left (direction.landing).
     this.landings = new Map();
@@ -117,6 +120,8 @@ export class Tide {
     this.dim = loaded.dim;
     for (const e of loaded.errors) this.problem(`setting ${e}; using its default`);
 
+    // What a tide before this one told the decoration no longer holds
+    this.tellDecoration("reset");
     this.ensureStanding();
     this.ws.windowAdded.connect((w) => this.added(w));
     this.ws.windowRemoved.connect((w) => this.removed(w));
@@ -274,6 +279,7 @@ export class Tide {
     if (key !== null) this.relayout(key);
     // A window on every desktop has no part to relayout, but counts for dimming
     else this.updateDim();
+    if (!this.tiled(w)) this.tellEdges(id, layout.FLOATING);
   }
 
   // A panel takes room from the tiles, and gives it back as it moves,
@@ -317,6 +323,7 @@ export class Tide {
     const app = this.watched.delete(id);
     this.dragFrom.delete(id);
     this.boxes.delete(id);
+    this.tellEdges(id, layout.FLOATING);
     this.history = this.history.filter((x) => x !== id);
     this.marks = this.marks.filter((m) => m !== id);
     if (this.heeded.delete(id)) this.announceAttention();
@@ -373,19 +380,45 @@ export class Tide {
     this.announce();
     if (windows.length === 0) return;
     const area = this.area(output, desktop);
-    const boxes = layout.arrange(this.parts.get(key), area, windows.map(idOf), this.config);
-    windows.forEach((w) => {
+    const part = this.parts.get(key);
+    const boxes = layout.arrange(part, area, windows.map(idOf), this.config);
+    windows.forEach((w, i) => {
       const id = idOf(w);
       const b = boxes.get(id);
       const want = { x: b.x, y: b.y, width: b.w, height: b.h };
       // Where tide last asked it to be, which it may yet be going to
       const asked = this.boxes.get(id);
       this.boxes.set(id, want);
+      this.tellEdges(id, layout.dragEdges(part, windows.length, i, b, area));
       // KWin has the one whose edge you're dragging, until you let go
       const from = this.dragFrom.get(id);
       if (from && from.resize) return;
       if (!sameBox(w.frameGeometry, want) || (asked && !sameBox(asked, want))) w.frameGeometry = want;
     });
+  }
+
+  // Tells tide's decoration which sides of tile `id` a drag moves, or that
+  // it's no tile (SPEC.md §4.8), when that has changed.
+  tellEdges(id, edges) {
+    const was = this.edges.has(id) ? this.edges.get(id) : layout.FLOATING;
+    if (was === edges) return;
+    if (edges === layout.FLOATING) this.edges.delete(id);
+    else this.edges.set(id, edges);
+    if (!this.tellDecoration("setEdges", id, edges)) this.edges.delete(id);
+  }
+
+  // Calls tide's decoration, which is inside KWin, at KWin's own D-Bus
+  // name. With no decoration nothing answers, and KWin's callDBus says
+  // nothing of it; so the decoration asks for everything again as it
+  // starts (reannounce). Returns whether the call was made.
+  tellDecoration(method, ...args) {
+    try {
+      this.env.callDBus("org.kde.KWin", "/org/tide/Decoration", "org.tide.Decoration", method, ...args);
+      return true;
+    } catch (e) {
+      this.log(`couldn't tell tide's decoration which sides of a tile drag (${e}), so its shadow may not resize it`);
+      return false;
+    }
   }
 
   relayoutAll() {
@@ -599,9 +632,14 @@ export class Tide {
   }
 
   // Tells the widget again, as one that's just loaded asks.
+  // tide's decoration asks the same way as it starts (SPEC.md §4.8): it
+  // has heard none of what tide said before then, so every tile's sides
+  // are told again.
   reannounce() {
     this.announced = null;
     this.announce();
+    this.edges.clear();
+    this.relayoutAll();
   }
 
   // --- Dimming inactive windows (SPEC.md §4.2) ---------------------------
@@ -857,6 +895,7 @@ export class Tide {
     else this.floating.add(id);
     const key = this.partKey(w);
     if (key !== null) this.relayout(key);
+    if (!this.tiled(w)) this.tellEdges(id, layout.FLOATING);
   }
 
   // --- Left, right, up and down (tide SPEC.md §6.6) ----------------------

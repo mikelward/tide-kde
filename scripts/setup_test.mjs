@@ -7,7 +7,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { KEYS } from "../src/keys.js";
-import { batchLines, formatEntry, lockWallpaper, parseEntry, plan, shortcutEntries } from "./setup.mjs";
+import {
+  APPEARANCE,
+  appearance,
+  batchLines,
+  decorationInstalled,
+  formatEntry,
+  lockWallpaper,
+  parseEntry,
+  plan,
+  shortcutEntries,
+} from "./setup.mjs";
 
 // Plasma 6.7's own bindings, as its kglobalshortcutsrc has them.
 const PLASMA = {
@@ -96,6 +106,73 @@ test("run again, it writes nothing more", () => {
   const config = { ...PLASMA };
   for (const [k, v] of writes(config)) config[k] = v;
   assert.deepEqual([...writes(config).keys()], []);
+});
+
+function decorationWrites(settings, config = {}) {
+  const out = new Map();
+  for (const w of plan((file, group, key) => config[`${file} ${group} ${key}`] ?? null, settings)) {
+    if (w.group === "tide-decoration" || w.group === "org.kde.kdecoration2") out.set(`${w.group} ${w.key}`, w.value);
+  }
+  return out;
+}
+
+test("with tide's decoration installed, KWin is given it and tide's Borders settings", () => {
+  assert.deepEqual([...decorationWrites(APPEARANCE)], [
+    ["org.kde.kdecoration2 library", "org.tide.decoration"],
+    ["tide-decoration Shadows", "focused"],
+    ["tide-decoration ShadowSize", "16"],
+    ["tide-decoration BorderWidth", "0"],
+    ["tide-decoration RoundedCorners", "true"],
+  ]);
+  const yours = { shadows: "all", shadowSize: 24, borderWidth: 2, roundedCorners: false };
+  assert.deepEqual([...decorationWrites(yours).values()], ["org.tide.decoration", "all", "24", "2", "false"]);
+});
+
+test("without it, KWin keeps the decoration it has", () => {
+  assert.equal(decorationWrites(null).size, 0);
+});
+
+test("the decoration's settings aren't written again", () => {
+  const config = {
+    "kwinrc org.kde.kdecoration2 library": "org.tide.decoration",
+    "kwinrc tide-decoration Shadows": "focused",
+    "kwinrc tide-decoration ShadowSize": "12",
+  };
+  assert.deepEqual([...decorationWrites(APPEARANCE, config).keys()],
+    ["tide-decoration ShadowSize", "tide-decoration BorderWidth", "tide-decoration RoundedCorners"]);
+});
+
+test("the Borders settings are appearance.json's, then appearance.local.json's, then tide's defaults", () => {
+  assert.deepEqual(appearance([["appearance.json", null], ["appearance.local.json", null]]),
+    { settings: { shadows: "focused", shadowSize: 16, borderWidth: 0, roundedCorners: true }, errors: [] });
+  const found = appearance([
+    ["appearance.json", '{"shadows": "all", "shadowSize": 8, "mode": "sun"}'],
+    ["appearance.local.json", '{"shadowSize": 24, "borderWidth": 2, "roundedCorners": false}'],
+  ]);
+  assert.deepEqual(found, { settings: { shadows: "all", shadowSize: 24, borderWidth: 2, roundedCorners: false }, errors: [] });
+});
+
+test("a Borders setting that makes no sense is named, and keeps its default", () => {
+  const found = appearance([
+    ["appearance.json", '{"shadows": "active", "shadowSize": 33, "borderWidth": 1.5, "roundedCorners": "yes"}'],
+    ["appearance.local.json", "{"],
+  ]);
+  assert.deepEqual(found.settings, APPEARANCE);
+  assert.equal(found.errors.length, 5);
+  assert.match(found.errors[0], /^appearance\.json: shadows must be one of "none", "floating", "focused", "all"$/);
+  assert.match(found.errors[1], /^appearance\.json: shadowSize must be a whole number from 0 to 32$/);
+  assert.match(found.errors[2], /^appearance\.json: borderWidth must be a whole number from 0 to 16$/);
+  assert.match(found.errors[3], /^appearance\.json: roundedCorners must be true or false$/);
+  assert.match(found.errors[4], /^appearance\.local\.json: /);
+  assert.deepEqual(appearance([["appearance.json", "[]"]]).errors, ["appearance.json: expected an object of settings"]);
+});
+
+test("the decoration counts as installed in your own Qt plugins, QT_PLUGIN_PATH's or Qt's", () => {
+  const at = (dir) => (path) => path === `${dir}/org.kde.kdecoration3/org.tide.decoration.so`;
+  assert.ok(decorationInstalled({}, "/home/you", [], at("/home/you/.local/lib/qt6/plugins")));
+  assert.ok(decorationInstalled({ QT_PLUGIN_PATH: "/a:/b" }, "/home/you", [], at("/b")));
+  assert.ok(decorationInstalled({}, "/home/you", ["/usr/lib/qt6/plugins"], at("/usr/lib/qt6/plugins")));
+  assert.ok(!decorationInstalled({ QT_PLUGIN_PATH: "" }, "/home/you", ["/usr/lib/qt6/plugins"], () => false));
 });
 
 test("the lock screen gets the desktop's image, and nothing without one", () => {

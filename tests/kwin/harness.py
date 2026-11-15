@@ -22,6 +22,10 @@ KWIN = os.environ.get("KWIN", "kwin_wayland")
 QDBUS = os.environ.get("QDBUS", "qdbus6")
 FOOT = os.environ.get("FOOT", "foot")
 KPACKAGETOOL = os.environ.get("KPACKAGETOOL", "kpackagetool6")
+# What `make test-kwin` builds: the Qt plugin directory tide's decoration
+# is in, and the tests' pointer (pointer.c).
+PLUGINS = os.environ.get("TIDE_PLUGINS", os.path.join(ROOT, "build", "decoration", "plugins"))
+POINTER = os.environ.get("TIDE_POINTER", os.path.join(ROOT, "build", "pointer"))
 TIMEOUT = float(os.environ.get("TIDE_TIMEOUT", "10"))
 
 
@@ -82,6 +86,13 @@ class KWinTest(unittest.TestCase):
     # How tide gets into KWin: "load" over D-Bus, as a test script; "install"
     # as a user does, with kpackagetool6 and kwinrc's Plugins; or None.
     LOAD = "load"
+    # Whether windows get tide's decoration, and its settings, kwinrc's
+    # [tide-decoration]. Without it they get none: the tests' KWin has no
+    # other.
+    DECORATION = False
+    # Whether tide's decoration can be found, for a test to choose later.
+    DECORATION_LATER = False
+    DECORATION_CONFIG = {}
 
     def setUp(self):
         self.home = tempfile.mkdtemp(prefix="tide-kde-test.")
@@ -92,8 +103,18 @@ class KWinTest(unittest.TestCase):
         self.env = dict(os.environ, HOME=self.home, XDG_RUNTIME_DIR=runtime,
                         XDG_CONFIG_HOME=os.path.join(self.home, ".config"),
                         XDG_DATA_HOME=os.path.join(self.home, ".local", "share"),
-                        LANG="C.UTF-8", QT_QPA_PLATFORM="", WAYLAND_DISPLAY="wayland-tide")
+                        LANG="C.UTF-8", QT_QPA_PLATFORM="", WAYLAND_DISPLAY="wayland-tide",
+                        # Lets the tests' pointer in (pointer.c)
+                        KWIN_WAYLAND_NO_PERMISSION_CHECKS="1")
         self.env.pop("DISPLAY", None)
+        if self.DECORATION or self.DECORATION_LATER:
+            if not os.path.exists(os.path.join(PLUGINS, "org.kde.kdecoration3", "org.tide.decoration.so")):
+                raise AssertionError(f"tide's decoration isn't built in {PLUGINS}; run make decoration")
+            self.env["QT_PLUGIN_PATH"] = PLUGINS
+        if self.DECORATION:
+            self.write_config({"library": "org.tide.decoration"}, group="org.kde.kdecoration2")
+            if self.DECORATION_CONFIG:
+                self.write_config(self.DECORATION_CONFIG, group="tide-decoration")
         if self.CONFIG:
             self.write_config(self.CONFIG)
         if self.LOAD == "install":
@@ -103,6 +124,7 @@ class KWinTest(unittest.TestCase):
                 raise AssertionError(f"kpackagetool6 couldn't install tide: {r.stdout}{r.stderr}")
             self.write_config({"tideEnabled": "true"}, group="Plugins")
         self.clients = []
+        self.mouse = None
         self.kwin = None
         self.log = None
         self.addCleanup(self.stop)
@@ -138,6 +160,12 @@ class KWinTest(unittest.TestCase):
 
     def stop(self):
         """Stops the windows and KWin."""
+        if self.mouse:
+            self.mouse.stdin.close()
+            self.mouse.stdout.close()
+            self.mouse.kill()
+            self.mouse.wait()
+            self.mouse = None
         for c in self.clients:
             c.kill()
             c.wait()
@@ -181,6 +209,34 @@ class KWinTest(unittest.TestCase):
             if time.monotonic() > deadline:
                 raise AssertionError(f"nothing took the D-Bus name {name}")
             select.select([], [], [], 0.05)
+
+    def pointer(self, *commands):
+        """Moves the pointer and presses its left button: "move", x, y,
+        "press" and "release", in order. KWin has taken them all by the
+        time this returns."""
+        # One pointer for the test: KWin lets go of a button as the client
+        # that pressed it leaves.
+        if not self.mouse:
+            self.mouse = subprocess.Popen([POINTER], env=self.env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+        self.mouse.stdin.write(" ".join(str(c) for c in commands) + "\n")
+        self.mouse.stdin.flush()
+        if self.mouse.stdout.readline() != "ok\n":
+            raise AssertionError(f"the tests' pointer failed on {commands}; KWin's log or the test's output says why")
+
+    def decoration(self, app):
+        """What tide's decoration has for the window of class `app`: {zone,
+        borders: [left, top, right, bottom], shadow, radius, edges}."""
+        out = self.qdbus("org.kde.KWin", "/org/tide/Decoration", "org.tide.Decoration.describe", self.state()["windows"][app]["id"])
+        if not out:
+            raise AssertionError(f"{app} has no tide decoration")
+        return json.loads(out)
+
+    def drags(self, since):
+        """The drags KWin has begun since log mark `since`, as the probe
+        said them. Call it after state(), which comes once KWin has taken
+        the pointer's last move."""
+        self.log.read()
+        return [l.split("probe: drag started ", 1)[1] for l in self.log.lines[since:] if "probe: drag started " in l]
 
     def load(self, path, name):
         self.qdbus("org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting.loadScript", path, name)

@@ -3,8 +3,14 @@
 #   make              build the script, package/contents/code/main.js
 #   make lint         every script parses
 #   make test         the unit tests (Node)
-#   make test-kwin    the script in a headless KWin (tests/kwin/); needs
-#                     what README.md's Development lists
+#   make test-kwin    the script and the decoration in a headless KWin
+#                     (tests/kwin/); needs what README.md's Development lists
+#   make decoration   build tide's window decoration (decoration/), a KWin
+#                     plugin in C++; needs what README.md's Decoration lists
+#   make test-zones   the decoration's rules (decoration/zones.h), with only
+#                     a C++ compiler
+#   make install-decoration  install the decoration for this user;
+#                     `make uninstall-decoration` takes it out
 #   make check-tideco compare the copied geometry and defaults check with
 #                     a tide for Chrome checkout (TIDECO=../tideco by default)
 #   make check-tide-defaults  compare the defaults that restate tide's with
@@ -36,7 +42,16 @@ TESTS = \
 	scripts/setup_test.mjs \
 	scripts/tidedefaults_test.mjs
 
-.PHONY: all lint test test-kwin check-tideco check-tide-defaults dist install uninstall setup version unshallow-check clean
+# The decoration builds under build/, and installs into this Qt plugin
+# directory, the user's own. Plasma's session finds it through
+# QT_PLUGIN_PATH, which ENV_SCRIPT sets as the session starts.
+PLUGIN_DIR ?= $(HOME)/.local/lib/qt6/plugins
+ENV_DIR ?= $(or $(XDG_CONFIG_HOME),$(HOME)/.config)/plasma-workspace/env
+ENV_SCRIPT = $(ENV_DIR)/tide-kde.sh
+DECORATION = build/decoration/plugins/org.kde.kdecoration3/org.tide.decoration.so
+FAKE_INPUT ?= /usr/share/plasma-wayland-protocols/fake-input.xml
+
+.PHONY: all lint test test-kwin test-zones decoration install-decoration uninstall-decoration check-tideco check-tide-defaults dist install uninstall setup version unshallow-check clean
 
 all: $(SCRIPT)
 
@@ -54,8 +69,26 @@ test:
 	if test -n "$$unlisted"; then echo "not in the Makefile's TESTS: $$unlisted" >&2; exit 1; fi
 	node --test $(TESTS)
 
-test-kwin: $(SCRIPT)
+test-kwin: $(SCRIPT) decoration build/pointer
 	cd tests/kwin && dbus-run-session -- python3 -m unittest discover -v
+
+decoration: $(DECORATION)
+
+$(DECORATION): decoration/CMakeLists.txt decoration/decoration.cpp decoration/zones.h decoration/metadata.json
+	cmake -S decoration -B build/decoration -DCMAKE_BUILD_TYPE=RelWithDebInfo
+	cmake --build build/decoration
+
+test-zones:
+	mkdir -p build
+	$(CXX) -std=c++20 -Wall -Wextra -Werror decoration/zones_test.cpp -o build/zones_test
+	build/zones_test
+
+# The tests' pointer, over KWin's fake input protocol.
+build/pointer: tests/kwin/pointer.c $(FAKE_INPUT)
+	mkdir -p build
+	wayland-scanner client-header $(FAKE_INPUT) build/fake-input-client-protocol.h
+	wayland-scanner private-code $(FAKE_INPUT) build/fake-input-protocol.c
+	$(CC) -Wall -Wextra -Werror -Ibuild tests/kwin/pointer.c build/fake-input-protocol.c -o $@ $$(pkg-config --cflags --libs wayland-client)
 
 check-tideco:
 	cmp $(TIDECO)/src/geometry.js src/geometry.js
@@ -101,6 +134,17 @@ install: $(SCRIPT)
 	kwriteconfig6 --file kwinrc --group Plugins --key tideEnabled true
 	@$(RELOAD_KWIN)
 
+# The decoration, for this user: KWin loads it at the next login, once
+# `make setup` has chosen it.
+install-decoration: decoration
+	cmake --install build/decoration --prefix $(PLUGIN_DIR)
+	mkdir -p $(ENV_DIR)
+	printf '%s\n' "# Written by tide-kde: where KWin finds tide's window decoration." \
+		'export QT_PLUGIN_PATH="$(PLUGIN_DIR)$${QT_PLUGIN_PATH:+:$$QT_PLUGIN_PATH}"' > $(ENV_SCRIPT)
+
+uninstall-decoration:
+	rm -f $(PLUGIN_DIR)/org.kde.kdecoration3/org.tide.decoration.so $(ENV_SCRIPT)
+
 setup:
 	node scripts/setup.mjs
 
@@ -111,4 +155,4 @@ uninstall:
 	kpackagetool6 --type Plasma/Applet --remove org.tide.layout
 
 clean:
-	rm -rf dist $(SCRIPT)
+	rm -rf dist build $(SCRIPT)

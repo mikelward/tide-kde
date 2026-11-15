@@ -35,10 +35,48 @@
     marks as wanting attention, which tide's launcher reads (SPEC.md §4.6).
 13. **Decided:** `tide-kde.service` stays tide's (SPEC.md §5).
 14. An undo for `make setup`: give Plasma back the keys it took, and put
-    back the dimming, focus stealing prevention, panel widget and lock
-    screen wallpaper settings it changed (SPEC.md §1).
+    back the dimming, focus stealing prevention, panel widget, lock
+    screen wallpaper and window decoration settings it changed (SPEC.md §1).
+15. **Done:** tide's window decoration (`decoration/`, SPEC.md §4.8): a
+    window's shadow is its drag-to-resize zone, floating or tiled, with
+    tide's shadow, border and corners, and the other tiles following a
+    dragged edge. To do:
+    - Look at it on a real Plasma session: the title bar, the buttons, the
+      shadow, the corners and the resize cursor have only been drawn in a
+      headless KWin, never seen. Check there too that KWin finds the
+      plugin through `QT_PLUGIN_PATH`.
+    - Have tide's shell write `[tide-decoration]` and reconfigure KWin as
+      the Borders page changes, as it writes Hyprland's and tidewm's
+      files (mikelward/tide), so a change applies at once.
+    - Have scripts' `setup-kde` run `make install-decoration`
+      (mikelward/scripts).
+    - Raise the focused tile under a focus policy that doesn't, so its
+      zone isn't under its neighbor.
+    - Resize within a stack by dragging, with tide (tide's TODO.md).
 
 ## Decisions needing review
+
+- **Should tide's windows lose their title bar on Plasma?** (2026-11-15)
+  They have none on Hyprland, tidewm or tidesway. tide's decoration draws
+  one, with Plasma's buttons, as nothing said to take it off; its
+  `TitleBar=false` does. Without one, a window closes, maximizes and moves
+  by tide's keys only.
+- tide's decoration (2026-11-15) draws its own plain title bar, not
+  Breeze's: a decoration is one plugin, so tide's shadow and zone can't be
+  added to Breeze's. Its buttons are close, maximize, minimize, the menu
+  and on all desktops; any other in Plasma's button settings is left out.
+- A tile's zone with no shadow is 4 px outside the window, not tide's
+  4 px either side of the edge: KWin gives a decoration no input inside
+  the frame (SPEC.md §4.8).
+- The decoration installs for the user alone, with no root, and reaches
+  KWin through `QT_PLUGIN_PATH`, set by a script in
+  `~/.config/plasma-workspace/env`. `make install` doesn't build it, as it
+  needs a compiler and headers: `make install-decoration` does.
+- `make setup` copies tide's Borders settings into `kwinrc` once. Until
+  tide's shell does it (item 15), a change needs `make setup` again.
+- A border is dark or light by Plasma's color scheme, not tide's schedule.
+- Dragging a tile's edge now moves the tiles beside it as you drag, not
+  only as you let go, as on tide's other compositors.
 
 - Minimizing the window you're in (2026-11-15) focuses the window under
   the pointer once the script has re-tiled, else the one you were in

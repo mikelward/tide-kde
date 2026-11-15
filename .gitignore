@@ -1,3 +1,4 @@
 package/contents/code/main.js
 dist/
 __pycache__/
+build/
