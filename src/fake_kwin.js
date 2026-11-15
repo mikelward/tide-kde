@@ -18,6 +18,10 @@ export class Signal {
 
 let nextId = 1;
 
+function sameFrame(a, b) {
+  return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+}
+
 export class FakeWindow {
   constructor(ws, props = {}) {
     this.ws = ws;
@@ -53,8 +57,8 @@ export class FakeWindow {
     this.requested = null;
     this.closed = false;
     for (const s of ["desktopsChanged", "outputChanged", "minimizedChanged", "fullScreenChanged", "maximizedChanged",
-      "activitiesChanged", "frameGeometryChanged", "demandsAttentionChanged",
-      "interactiveMoveResizeStarted", "interactiveMoveResizeFinished"]) this[s] = new Signal();
+      "activitiesChanged", "frameGeometryAboutToChange", "frameGeometryChanged", "demandsAttentionChanged",
+      "interactiveMoveResizeStarted", "interactiveMoveResizeStepped", "interactiveMoveResizeFinished"]) this[s] = new Signal();
     Object.assign(this, props);
     if (props.frameGeometry) this._frame = props.frameGeometry;
   }
@@ -112,6 +116,38 @@ export class FakeWindow {
   }
   closeWindow() {
     this.ws.close(this);
+  }
+  // An interactive resize, step by step, as KWin's
+  // Window::updateInteractiveMoveResize: each step says where the window
+  // is going, which its frame follows.
+  resizeStart() {
+    this.resize = true;
+    this.interactiveMoveResizeStarted.emit();
+  }
+  resizeStep(box) {
+    const g = Object.assign({}, this.frameGeometry, box);
+    this.frameGeometryAboutToChange.emit();
+    this.frameGeometry = g;
+    this.interactiveMoveResizeStepped.emit(g);
+    if (!this.ws.lag) this.frameGeometryChanged.emit();
+  }
+  resizeEnd() {
+    this.resize = false;
+    this.interactiveMoveResizeFinished.emit();
+  }
+  // A resize cancelled, as with Escape: KWin's finishInteractiveMoveResize
+  // asks the window to go back to `start`, where it began, and says it
+  // finished, with no step; the frame follows once the app has resized.
+  resizeCancel(start) {
+    this.resize = false;
+    this.frameGeometryAboutToChange.emit();
+    // What it was last asked for is `start` now
+    if (this.ws.lag) this.requested = sameFrame(this._frame, start) ? null : start;
+    this.interactiveMoveResizeFinished.emit();
+    if (this.ws.lag) return;
+    // Unless tide has asked it for another since
+    if (this._frame.width !== start.width || this._frame.x !== start.x) return;
+    this.frameGeometryChanged.emit();
   }
   // An interactive drag that ends at `box`, with the cursor at `cursor`.
   drag(box, { resize = false, cursor = null } = {}) {
