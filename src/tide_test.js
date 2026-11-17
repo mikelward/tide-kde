@@ -999,3 +999,68 @@ test("closing a window you aren't in moves no focus", () => {
   a.closeWindow();
   assert.equal(ws.activeWindow, c);
 });
+
+const desktop = (ws, name) => ws.desktops.find((d) => d.name === name);
+
+test("a browser restarting puts each window back on its desktop", () => {
+  const { ws, env } = start();
+  const mail = ws.open({ resourceClass: "brave-browser", caption: "Mail - Brave", _desktops: [desktop(ws, "re")] });
+  const docs = ws.open({ resourceClass: "brave-browser", caption: "Docs - Brave", _desktops: [desktop(ws, "oc")] });
+  ws.close(mail);
+  ws.close(docs);
+  env.clock = 60000;
+  const a = ws.open({ resourceClass: "brave-browser", caption: "Docs - Brave" });
+  const b = ws.open({ resourceClass: "brave-browser", caption: "Brave" });
+  assert.deepEqual(a.desktops.map((d) => d.name), ["oc"]);
+  assert.deepEqual(b.desktops.map((d) => d.name), ["in"], "no closed window had its title yet");
+  env.clock = 61000;
+  b.caption = "Mail - Brave";
+  assert.deepEqual(b.desktops.map((d) => d.name), ["re"], "it went back once its title matched");
+});
+
+test("a reopened window's desktop is made again if it went", () => {
+  const { ws, env } = start();
+  ws.createDesktop(ws.desktops.length, "work");
+  const w = ws.open({ resourceClass: "brave-browser", caption: "PR - Brave", _desktops: [desktop(ws, "work")] });
+  ws.close(w);
+  ws.removeDesktop(desktop(ws, "work"));
+  env.clock = 5000;
+  const again = ws.open({ resourceClass: "brave-browser", caption: "PR - Brave" });
+  assert.deepEqual(again.desktops.map((d) => d.name), ["work"]);
+  assert.equal(ws.desktops.filter((d) => d.name === "work").length, 1);
+});
+
+test("a new window beside its app's others stays where it opens", () => {
+  const { ws, env } = start();
+  ws.open({ resourceClass: "brave-browser", caption: "Mail - Brave", _desktops: [desktop(ws, "re")] });
+  const docs = ws.open({ resourceClass: "brave-browser", caption: "Docs - Brave", _desktops: [desktop(ws, "oc")] });
+  ws.close(docs);
+  env.clock = 5000;
+  const w = ws.open({ resourceClass: "brave-browser", caption: "Docs - Brave" });
+  assert.deepEqual(w.desktops.map((d) => d.name), ["in"]);
+});
+
+test("a reopened window minimized before its title matched stays minimized", () => {
+  const { ws, env } = start();
+  const mail = ws.open({ resourceClass: "brave-browser", caption: "Mail - Brave", _desktops: [desktop(ws, "re")] });
+  ws.close(mail);
+  env.clock = 5000;
+  const w = ws.open({ resourceClass: "brave-browser", caption: "Brave" });
+  w.minimized = true;
+  env.clock = 6000;
+  w.caption = "Mail - Brave";
+  assert.deepEqual(w.desktops.map((d) => d.name), ["in"]);
+  assert.equal(w.minimized, true);
+});
+
+test("a window on a desktop renamed since goes back to its new name", () => {
+  const { ws, env } = start();
+  ws.createDesktop(ws.desktops.length, "work");
+  const w = ws.open({ resourceClass: "brave-browser", caption: "PR - Brave", _desktops: [desktop(ws, "work")] });
+  desktop(ws, "work").name = "renamed";
+  ws.close(w);
+  env.clock = 5000;
+  const again = ws.open({ resourceClass: "brave-browser", caption: "PR - Brave" });
+  assert.deepEqual(again.desktops.map((d) => d.name), ["renamed"]);
+  assert.equal(ws.desktops.some((d) => d.name === "work"), false, "no desktop made under the old name");
+});

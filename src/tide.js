@@ -9,6 +9,7 @@
 import * as direction from "./direction.js";
 import * as geometry from "./geometry.js";
 import * as layout from "./layout.js";
+import * as reopened from "./reopened.mjs";
 import * as settings from "./settings.js";
 import * as workspaces from "./workspaces.js";
 import { KEYS } from "./keys.js";
@@ -52,6 +53,9 @@ export class Tide {
     // Where a window moved by side lands in its new part, by id: the way it
     // went and the box it left (direction.landing).
     this.landings = new Map();
+    // The windows seen and those closed, for sending reopened ones back to
+    // their desktops (reopened.mjs).
+    this.reopened = reopened.NOTHING;
     this.config = layout.DEFAULTS;
     this.standing = workspaces.DEFAULT_STANDING;
     this.dim = true;
@@ -245,6 +249,9 @@ export class Tide {
       w.fullScreenChanged?.connect(again);
       w.maximizedChanged?.connect(again);
       w.activitiesChanged?.connect(again);
+      w.desktopsChanged?.connect(() => this.windowsChanged());
+      w.captionNormalChanged?.connect(() => this.windowsChanged());
+      w.minimizedChanged?.connect(() => this.windowsChanged());
       w.moveableChanged?.connect(again);
       w.resizeableChanged?.connect(again);
       w.interactiveMoveResizeStarted?.connect(() => this.dragStarted(w));
@@ -254,6 +261,45 @@ export class Tide {
       w.frameGeometryChanged?.connect(() => this.dragAsked(w, false));
     }
     this.place(w, quiet ? null : this.ws.activeWindow);
+    this.windowsChanged();
+  }
+
+  // Reopened windows go back to their desktops (tide SPEC.md §6.5): an
+  // app's windows that open again, with the titles of windows of its that
+  // closed, go back where those were, made again if they went. `gone` is a
+  // window going, and `watched` whether tide watched it: if so, it's looked
+  // at once more first, as it is now, since its desktop may have been
+  // renamed since it was last seen. Then it's left out, though KWin may
+  // still list it.
+  windowsChanged(gone = null, watched = false) {
+    const others = this.ws.windowList().filter((w) => w !== gone && this.candidate(w));
+    if (gone && watched) this.windowsSeen(others.concat([gone]));
+    this.windowsSeen(others);
+  }
+
+  windowsSeen(windows) {
+    const now = this.env.now ? this.env.now() : Date.now();
+    const list = windows.map((w) => {
+      const desktops = w.desktops ?? [];
+      const workspace = desktops.length === 1 ? desktops[0].name : "";
+      return {
+        address: idOf(w),
+        app: String(w.resourceClass ?? ""),
+        title: String(w.captionNormal ?? w.caption ?? ""),
+        workspace,
+        // A window minimized while it waits for its title stays put.
+        place: w.minimized ? `${workspace}\nminimized` : workspace,
+      };
+    });
+    const r = reopened.windowsChanged(this.reopened, list, now);
+    this.reopened = r.state;
+    for (const m of r.moves) {
+      const w = this.ws.windowList().find((x) => idOf(x) === m.address);
+      if (!w || w.deleted) continue;
+      const desktop = this.ws.desktops.find((d) => workspaces.sameName(d.name, m.workspace)) ?? null;
+      this.log(`sending ${m.app}'s window, reopened, back to ${m.workspace}`);
+      this.send(w, { name: m.workspace, desktop });
+    }
   }
 
   // Puts `w` in the part it belongs in, taking it out of any other, and
@@ -334,6 +380,7 @@ export class Tide {
       this.updateDim();
     }
     if (app) this.refocus(w, { sameOutput: false });
+    this.windowsChanged(w, app);
   }
 
   minimizedChanged(w) {

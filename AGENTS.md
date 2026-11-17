@@ -1,7 +1,7 @@
 ---
 trigger: always_on
 alwaysApply: true
-last_modified: 2026-11-15
+last_modified: 2026-11-17
 ---
 
 # tide-kde
@@ -128,6 +128,7 @@ Shared by every mikelward repo and the user-level agent config; canonical in mik
   headless `kwin_wayland`, `tests/kwin/`, with the decoration and a pointer of the
   tests' own); every `*_test.js` must be listed in the `Makefile`. `make
   check-tideco` compares the copied geometry with tide for Chrome's, and `make
-  check-tide-defaults` the defaults that restate tide's with a tide checkout.
+  check-tide-defaults` the defaults that restate tide's with a tide checkout, and
+  `make check-tide-reopened` the copied reopened windows' rules.
 - **KWin**. Only a headless one runs here, in a container from `ubuntu:devel` (CI's
   `kwin` job says how). Say what only the fake KWin (`src/fake_kwin.js`) tested.
