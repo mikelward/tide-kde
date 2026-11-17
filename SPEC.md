@@ -146,6 +146,7 @@ Status: **yes**, **partial**, **no**, or **differs** (done another way).
 | A monitor's part, `@` | differs | KWin has no per-monitor desktop. Each monitor's windows are laid out on their own already |
 | Minimize and restore (`Meta+Z`) | yes | A window's `minimized` |
 | Move a window to a monitor | yes | `sendClientToScreen`, by the arrows' rule (tide §6.6) |
+| Reopened windows go back to their workspaces | yes | `src/reopened.mjs`, tide's own rules copied, which `make check-tide-reopened` compares: from the windows KWin lists, by `resourceClass` and `captionNormal`, sent back by setting `desktops`. KWin 6.7's own xdg-session-management restores the desktops of an app that asks for it before tide sees the window; Chromium doesn't ask yet (tide §6.5) |
 
 ### 4.4 Focus and attention (tide §14)
 

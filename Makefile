@@ -15,6 +15,8 @@
 #                     a tide for Chrome checkout (TIDECO=../tideco by default)
 #   make check-tide-defaults  compare the defaults that restate tide's with
 #                     a tide checkout (TIDE=../tide by default)
+#   make check-tide-reopened  compare the copied reopened windows' rules
+#                     with a tide checkout
 #   make dist         dist/tide.kwinscript, for KWin's "Install from File",
 #                     and dist/tide-layout.plasmoid, the layout widget
 #   make install      install both for this user, turn the script on, and
@@ -26,7 +28,7 @@
 TIDECO ?= ../tideco
 TIDE ?= ../tide
 SCRIPT = package/contents/code/main.js
-SRC = $(filter-out %_test.js src/fake_kwin.js,$(wildcard src/*.js))
+SRC = $(filter-out %_test.js %_test.mjs src/fake_kwin.js,$(wildcard src/*.js src/*.mjs))
 
 # Every test file runs from here. `make test` fails if a *_test.js isn't
 # listed, since an unlisted test never runs.
@@ -34,6 +36,7 @@ TESTS = \
 	src/direction_test.js \
 	src/geometry_test.js \
 	src/layout_test.js \
+	src/reopened_test.mjs \
 	src/settings_test.js \
 	src/tide_test.js \
 	src/workspaces_test.js \
@@ -51,7 +54,7 @@ ENV_SCRIPT = $(ENV_DIR)/tide-kde.sh
 DECORATION = build/decoration/plugins/org.kde.kdecoration3/org.tide.decoration.so
 FAKE_INPUT ?= /usr/share/plasma-wayland-protocols/fake-input.xml
 
-.PHONY: all lint test test-kwin test-zones decoration install-decoration uninstall-decoration check-tideco check-tide-defaults dist install uninstall setup version unshallow-check clean
+.PHONY: all lint test test-kwin test-zones decoration install-decoration uninstall-decoration check-tideco check-tide-defaults check-tide-reopened dist install uninstall setup version unshallow-check clean
 
 all: $(SCRIPT)
 
@@ -60,7 +63,7 @@ $(SCRIPT): $(SRC) scripts/bundle.mjs
 	node scripts/bundle.mjs src/main.js > $@.tmp && mv $@.tmp $@
 
 lint:
-	@for f in src/*.js scripts/*.mjs tests/kwin/probe.js; do node --check "$$f" || exit 1; done
+	@for f in src/*.js src/*.mjs scripts/*.mjs tests/kwin/probe.js; do node --check "$$f" || exit 1; done
 	python3 -m py_compile tests/kwin/*.py
 
 test:
@@ -101,6 +104,11 @@ check-tideco:
 # listed in the script.
 check-tide-defaults:
 	node scripts/check-tide-defaults.mjs $(TIDE)
+
+# Reopened windows go back to their desktops by tide's own rules, copied.
+check-tide-reopened:
+	cmp $(TIDE)/shell/lib/reopened.mjs src/reopened.mjs
+	cmp $(TIDE)/shell/lib/reopened_test.mjs src/reopened_test.mjs
 
 # The version is the number of commits, so each push to main is a higher
 # one, released by CI as v<version>.

@@ -37,6 +37,9 @@ which this script tells it.
   The standing ones, `in`, `re`, `oc` and `me` by default, are made at
   start, in their order, and stay. The first is home, and takes the first
   desktop's name. Any other desktop goes once you leave it empty.
+- **Reopened windows** go back to their desktops: when an app, a browser
+  restarting to update say, opens again windows with the titles of the
+  ones it closed, each goes back where its namesake was.
 
 ## Install
 
@@ -187,6 +190,7 @@ tide's face on it needs a change to Plasma (SPEC.md §4.7).
     make test-zones       # the decoration's rules, with only a C++ compiler
     make check-tideco     # the geometry and defaults check are tide for Chrome's, unchanged
     make check-tide-defaults  # the layout defaults and standing workspaces are tide's
+    make check-tide-reopened  # the reopened windows' rules are tide's, unchanged
 
 `make test-kwin` needs `kwin_wayland`, KWin's package structures
 (Debian's and Ubuntu's `kwin-common`), `kpackagetool6`, `kreadconfig6`

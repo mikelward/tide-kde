@@ -27,6 +27,7 @@ export class FakeWindow {
     this.ws = ws;
     this.internalId = `{w${nextId++}}`;
     this.resourceClass = props.resourceClass ?? "app";
+    this._caption = props.caption ?? "";
     this.managed = true;
     this.deleted = false;
     this.normalWindow = true;
@@ -57,7 +58,7 @@ export class FakeWindow {
     this.requested = null;
     this.closed = false;
     for (const s of ["desktopsChanged", "outputChanged", "minimizedChanged", "fullScreenChanged", "maximizedChanged",
-      "activitiesChanged", "frameGeometryAboutToChange", "frameGeometryChanged", "demandsAttentionChanged",
+      "activitiesChanged", "captionNormalChanged", "frameGeometryAboutToChange", "frameGeometryChanged", "demandsAttentionChanged",
       "interactiveMoveResizeStarted", "interactiveMoveResizeStepped", "interactiveMoveResizeFinished"]) this[s] = new Signal();
     Object.assign(this, props);
     if (props.frameGeometry) this._frame = props.frameGeometry;
@@ -77,6 +78,15 @@ export class FakeWindow {
   set desktops(v) {
     this._desktops = v;
     this.desktopsChanged.emit();
+  }
+  // KWin's caption adds " <2>" and the like to a second window with the
+  // same title; captionNormal is the title as the app gave it.
+  get captionNormal() {
+    return this._caption;
+  }
+  set caption(v) {
+    this._caption = v;
+    this.captionNormalChanged.emit();
   }
   get demandsAttention() {
     return this._demandsAttention;
@@ -334,7 +344,8 @@ export class FakeWorkspace {
 
 // The env tide.js takes, around `ws`: shortcuts by name in `shortcuts`,
 // config from `config`, D-Bus calls in `calls`, the log in `logs`, and
-// what's to run later in `pending`, until `settle`.
+// what's to run later in `pending`, until `settle`, and the time in ms in
+// `clock`.
 export function fakeEnv(ws, config = {}) {
   const env = {
     workspace: ws,
@@ -343,6 +354,10 @@ export function fakeEnv(ws, config = {}) {
     calls: [],
     pending: [],
     logs: [],
+    clock: 0,
+    now() {
+      return env.clock;
+    },
     registerShortcut(name, _title, _key, f) {
       env.shortcuts.set(name, f);
     },

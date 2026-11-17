@@ -30,6 +30,7 @@ jobs:
       - run: make test-zones
       - run: make check-tideco TIDECO=tideco
       - run: make check-tide-defaults TIDE=tide
+      - run: make check-tide-reopened TIDE=tide
   # The script and the decoration in a real, headless KWin. Ubuntu's devel
   # release packages KWin 6; Debian testing has no kwin-wayland. The second
   # line of packages builds the decoration, and the third the tests' pointer.
