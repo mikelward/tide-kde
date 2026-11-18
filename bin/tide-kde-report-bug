@@ -1,0 +1,59 @@
+#!/bin/sh
+#
+# tide-kde-report-bug: what Meta+Shift+B runs (SPEC.md §4.9), through
+# tide-kde-report-bug.service, which the KWin script has systemd start:
+# tide's own bug report, `tide report-bug`. It copies the report to the
+# clipboard, opens the issue page and saves the report under
+# ~/.local/state/tide/reports. Without tide, or with a tide too old to
+# have it, a notification says what to do.
+#
+# It runs tide's report in a scope of its own, so what that leaves running
+# (the clipboard's owner, a browser it starts) outlives this unit.
+#
+# Its log, and the report's, go to the journal through the unit.
+
+prog=tide-kde-report-bug
+
+log() {
+    printf '%s: %s\n' "$prog" "$1" >&2
+}
+
+notify() {
+    log "$1"
+    if ! busctl --user call org.freedesktop.Notifications /org/freedesktop/Notifications \
+        org.freedesktop.Notifications Notify 'susssasa{sv}i' tide 0 "" tide "$1" 0 0 -1 >/dev/null; then
+        log "couldn't show a notification, so only this log says it"
+    fi
+}
+
+log "started"
+if ! command -v tide >/dev/null 2>&1; then
+    notify "To report a bug, install tide (github.com/mikelward/tide)"
+    log "ended: tide isn't installed"
+    exit 127
+fi
+
+out=$(mktemp) || {
+    notify "Couldn't report a bug: couldn't make a temporary file"
+    log "ended: no temporary file"
+    exit 1
+}
+trap 'rm -f "$out"' EXIT
+
+systemd-run --user --scope --quiet --collect -- tide report-bug >"$out" 2>&1
+status=$?
+cat "$out" >&2
+
+# A tide without report-bug prints its usage, which doesn't name it, and
+# exits 2.
+if test "$status" -eq 2 && grep -q '^usage:' "$out" && ! grep -q 'report-bug' "$out"; then
+    notify "To report a bug, update tide: this one can't"
+    log "ended: tide has no report-bug"
+    exit 2
+fi
+if test "$status" -ne 0; then
+    notify "Couldn't report a bug: tide report-bug failed"
+    log "ended: tide report-bug exited $status"
+    exit "$status"
+fi
+log "ended: reported"

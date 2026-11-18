@@ -33,7 +33,8 @@ jobs:
       - run: make check-tide-reopened TIDE=tide
   # The script and the decoration in a real, headless KWin. Ubuntu's devel
   # release packages KWin 6; Debian testing has no kwin-wayland. The second
-  # line of packages builds the decoration, and the third the tests' pointer.
+  # line of packages builds the decoration, and the third the tests' pointer
+  # and their stand-in for systemd.
   kwin:
     runs-on: ubuntu-latest
     container: ubuntu:devel
@@ -43,7 +44,7 @@ jobs:
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             ca-certificates git kwin-wayland kwin-common kpackagetool6 libkf6config-bin foot qdbus-qt6 dbus python3 nodejs make \
             g++ cmake extra-cmake-modules qt6-base-dev qt6-declarative-dev libkdecorations3-dev libkf6coreaddons-dev libkf6config-dev \
-            gcc pkgconf libwayland-dev libwayland-bin plasma-wayland-protocols
+            gcc pkgconf libwayland-dev libwayland-bin plasma-wayland-protocols python3-dbus python3-gi
       - uses: actions/checkout@v4
         with:
           persist-credentials: false

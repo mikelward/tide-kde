@@ -93,6 +93,8 @@ class KWinTest(unittest.TestCase):
     # Whether tide's decoration can be found, for a test to choose later.
     DECORATION_LATER = False
     DECORATION_CONFIG = {}
+    # More of KWin's environment, such as QT_LOGGING_RULES.
+    ENV = {}
 
     def setUp(self):
         self.home = tempfile.mkdtemp(prefix="tide-kde-test.")
@@ -107,6 +109,7 @@ class KWinTest(unittest.TestCase):
                         # Lets the tests' pointer in (pointer.c)
                         KWIN_WAYLAND_NO_PERMISSION_CHECKS="1")
         self.env.pop("DISPLAY", None)
+        self.env.update(self.ENV)
         if self.DECORATION or self.DECORATION_LATER:
             if not os.path.exists(os.path.join(PLUGINS, "org.kde.kdecoration3", "org.tide.decoration.so")):
                 raise AssertionError(f"tide's decoration isn't built in {PLUGINS}; run make decoration")
@@ -153,7 +156,7 @@ class KWinTest(unittest.TestCase):
             self.load(SCRIPT, "tide")
         self.qdbus("org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting.start")
         # The scripts start in either order
-        waiting = {"probe: ready"} | ({"tide: started"} if self.LOAD else set())
+        waiting = {"probe: ready"} | ({"tide-kde: started"} if self.LOAD else set())
         while waiting:
             line = self.log.wait(lambda l: any(w in l for w in waiting), " and ".join(sorted(waiting)))
             waiting = {w for w in waiting if w not in line}

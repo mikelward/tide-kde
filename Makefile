@@ -21,9 +21,11 @@
 #                     and dist/tide-layout.plasmoid, the layout widget
 #   make install      install both for this user, turn the script on, and
 #                     have KWin load it; `make uninstall` takes them out
+#   make install-report-bug  install the unit Meta+Shift+B starts to report
+#                     a bug, as install and setup do
 #   make setup        free Plasma's keys that tide's take, set dimming and
-#                     focus stealing prevention, and put the layout widget
-#                     on the panel (scripts/setup.mjs)
+#                     focus stealing prevention, put the layout widget on
+#                     the panel (scripts/setup.mjs), and install-report-bug
 
 TIDECO ?= ../tideco
 TIDE ?= ../tide
@@ -53,8 +55,13 @@ ENV_DIR ?= $(or $(XDG_CONFIG_HOME),$(HOME)/.config)/plasma-workspace/env
 ENV_SCRIPT = $(ENV_DIR)/tide-kde.sh
 DECORATION = build/decoration/plugins/org.kde.kdecoration3/org.tide.decoration.so
 FAKE_INPUT ?= /usr/share/plasma-wayland-protocols/fake-input.xml
+# Report a bug (SPEC.md §4.9): the script it runs, and the user unit the
+# KWin script has systemd start.
+REPORT_BUG ?= $(or $(XDG_DATA_HOME),$(HOME)/.local/share)/tide-kde/tide-kde-report-bug
+UNIT_DIR ?= $(or $(XDG_CONFIG_HOME),$(HOME)/.config)/systemd/user
+UNIT = $(UNIT_DIR)/tide-kde-report-bug.service
 
-.PHONY: all lint test test-kwin test-zones decoration install-decoration uninstall-decoration check-tideco check-tide-defaults check-tide-reopened dist install uninstall setup version unshallow-check clean
+.PHONY: all lint test test-kwin test-zones decoration install-decoration uninstall-decoration check-tideco check-tide-defaults check-tide-reopened dist install uninstall install-report-bug uninstall-report-bug setup version unshallow-check clean
 
 all: $(SCRIPT)
 
@@ -64,6 +71,7 @@ $(SCRIPT): $(SRC) scripts/bundle.mjs
 
 lint:
 	@for f in src/*.js src/*.mjs scripts/*.mjs tests/kwin/probe.js; do node --check "$$f" || exit 1; done
+	sh -n bin/tide-kde-report-bug
 	python3 -m py_compile tests/kwin/*.py
 
 test:
@@ -71,6 +79,7 @@ test:
 		case " $(TESTS) " in *" $$f "*) ;; *) echo "$$f";; esac; done); \
 	if test -n "$$unlisted"; then echo "not in the Makefile's TESTS: $$unlisted" >&2; exit 1; fi
 	node --test $(TESTS)
+	sh bin/tide-kde-report-bug_test.sh
 
 test-kwin: $(SCRIPT) decoration build/pointer
 	cd tests/kwin && dbus-run-session -- python3 -m unittest discover -v
@@ -136,7 +145,12 @@ dist: $(SCRIPT) unshallow-check
 RELOAD_KWIN = if qdbus6 org.kde.KWin >/dev/null 2>&1; then qdbus6 org.kde.KWin /KWin reconfigure; \
 	else echo "KWin isn't running, so tide loads at the next Plasma login"; fi
 
-install: $(SCRIPT)
+# Has your systemd read the units again. Where it isn't running for you,
+# it reads them as it starts.
+RELOAD_SYSTEMD = if ! systemctl --user daemon-reload 2>/dev/null; then \
+	echo "systemd isn't running for you, so reporting a bug works from the next login"; fi
+
+install: $(SCRIPT) install-report-bug
 	kpackagetool6 --type KWin/Script --upgrade package 2>/dev/null || kpackagetool6 --type KWin/Script --install package
 	kpackagetool6 --type Plasma/Applet --upgrade plasmoid 2>/dev/null || kpackagetool6 --type Plasma/Applet --install plasmoid
 	kwriteconfig6 --file kwinrc --group Plugins --key tideEnabled true
@@ -153,10 +167,21 @@ install-decoration: decoration
 uninstall-decoration:
 	rm -f $(PLUGIN_DIR)/org.kde.kdecoration3/org.tide.decoration.so $(ENV_SCRIPT)
 
-setup:
+setup: install-report-bug
 	node scripts/setup.mjs
 
-uninstall:
+# Report a bug's script and the unit that runs it, for this user.
+install-report-bug:
+	mkdir -p "$(dir $(REPORT_BUG))" "$(UNIT_DIR)"
+	install -m 755 bin/tide-kde-report-bug "$(REPORT_BUG)"
+	sed 's|@REPORT_BUG@|$(REPORT_BUG)|' systemd/tide-kde-report-bug.service.in >"$(UNIT)"
+	@$(RELOAD_SYSTEMD)
+
+uninstall-report-bug:
+	rm -f "$(UNIT)" "$(REPORT_BUG)"
+	@$(RELOAD_SYSTEMD)
+
+uninstall: uninstall-report-bug
 	kwriteconfig6 --file kwinrc --group Plugins --key tideEnabled false
 	@$(RELOAD_KWIN)
 	kpackagetool6 --type KWin/Script --remove tide

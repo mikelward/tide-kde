@@ -1,0 +1,9 @@
+# What tide-kde's Meta+Shift+B starts (SPEC.md §4.9): tide's bug report.
+# `make install` writes it, naming where it put the script.
+[Unit]
+Description=Report a bug in tide on KDE
+Documentation=https://github.com/mikelward/tide-kde
+
+[Service]
+Type=oneshot
+ExecStart="@REPORT_BUG@"
