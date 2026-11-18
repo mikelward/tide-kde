@@ -1,8 +1,8 @@
 // tide on KWin (SPEC.md §4): tiles each desktop's windows per monitor in
 // tide's layouts, and runs tide's window and workspace keys. Everything it
 // knows of KWin comes in `env`, so tests hand it a fake:
-//   workspace, KWin, registerShortcut, readConfig, callDBus, print
-// as KWin's script engine has them.
+//   workspace, KWin, registerShortcut, readConfig, callDBus, print, info
+// as KWin's script engine has them (`info` is its console.info).
 //
 // A workspace is a KWin desktop, which spans every monitor; each monitor's
 // part of it has its own layout (layout.js), keyed by desktop and output.
@@ -78,13 +78,20 @@ export class Tide {
     this.history = [];
     this.current = null;
     // What happened in this turn of KWin's event loop: the window that lost
-    // activation first, with the history as it was, and the windows KWin's
-    // activation cleared the mark of. Null between turns.
+    // activation first, with the history as it was, the windows KWin's
+    // activation cleared the mark of, and the desktop and window tide
+    // switched to, until KWin says it has. Null between turns.
     this.turn = null;
+    // Why tide is acting, for the log: the key being pressed, or null.
+    this.why = null;
   }
 
+  // Logs `text` as tide-kde's, at info level where KWin gives it, as
+  // print's debug level is one logging rules may hide (SPEC.md §4.9).
   log(text) {
-    this.env.print(`tide: ${text}`);
+    const line = `tide-kde: ${text}`;
+    if (this.env.info) this.env.info(line);
+    else this.env.print(line);
   }
 
   // Says what's wrong where you'll see it, and in KWin's log.
@@ -152,11 +159,102 @@ export class Tide {
   }
 
   run(key) {
+    this.why = `key ${key.name}`;
     try {
       this[key.action](key.arg);
     } catch (e) {
       this.log(`${key.name} failed: ${e}`);
+    } finally {
+      this.why = null;
     }
+  }
+
+  // --- The log of workspace switches and focus moves (SPEC.md §4.9) ------
+
+  // Why tide does what it does now: `rule`, and the key pressed.
+  because(rule = null) {
+    if (!rule) return this.why ?? "tide";
+    return this.why ? `${rule}, ${this.why}` : rule;
+  }
+
+  // `w`'s app and workspace, for the log.
+  describe(w) {
+    const desktops = w.desktops ?? [];
+    const where = desktops.length === 0 ? "every workspace" : desktops.map((d) => d.name).join(", ");
+    return `${w.resourceClass || "a window"} on ${where}`;
+  }
+
+  // Shows desktop `d`, logging it and why.
+  switchTo(d, rule = null) {
+    const from = this.ws.currentDesktop;
+    if (!d || (from && d.id === from.id)) return;
+    this.log(`workspace ${from ? from.name : "none"} -> ${d.name} (${this.because(rule)})`);
+    this.thisTurn().desktop = d.id;
+    this.ws.currentDesktop = d;
+  }
+
+  // Focuses `w`, logging it and why, unless it has focus already.
+  focus(w, rule = null) {
+    const active = this.ws.activeWindow;
+    if (!active || idOf(active) !== idOf(w)) {
+      this.log(`focus ${this.describe(w)} (${this.because(rule)})`);
+      this.thisTurn().focus = idOf(w);
+    }
+    this.ws.activeWindow = w;
+  }
+
+  // KWin says desktop `d` is shown: logged if tide didn't switch to it.
+  sawDesktop(previous, d) {
+    if (this.turn && this.turn.desktop === d.id) {
+      this.turn.desktop = null;
+      return;
+    }
+    this.log(`workspace ${previous ? previous.name : "none"} -> ${d.name} (not tide)`);
+  }
+
+  // KWin says `w`, or nothing, has focus: logged if tide didn't focus it.
+  // Plasma's panels and the like aren't app windows, and aren't logged.
+  sawFocus(w) {
+    const id = w ? idOf(w) : null;
+    const turn = this.thisTurn();
+    if (id !== null && turn.focus === id) {
+      turn.focus = null;
+      return;
+    }
+    if (w === null) this.log("focus nothing (not tide)");
+    else if (this.appWindow(w)) this.log(`focus ${this.describe(w)} (not tide)`);
+  }
+
+  // --- Report a bug (SPEC.md §4.9) ---------------------------------------
+
+  // Meta+Shift+B: has systemd start tide-kde's unit, which runs tide's
+  // collector, `tide report-bug`. A script can't run a program, and
+  // callDBus says nothing of a call that fails, so it asks first whether
+  // the unit is there.
+  reportBug() {
+    const unit = "tide-kde-report-bug.service";
+    const systemd = "org.freedesktop.systemd1";
+    const manager = "org.freedesktop.systemd1.Manager";
+    const fail = (e) => this.problem(`Couldn't report a bug: ${e}`);
+    this.log("reporting a bug");
+    this.env.callDBus(systemd, "/org/freedesktop/systemd1", manager, "LoadUnit", unit, (path) => {
+      try {
+        this.env.callDBus(systemd, String(path), "org.freedesktop.DBus.Properties", "Get",
+          "org.freedesktop.systemd1.Unit", "LoadState", (state) => {
+            try {
+              if (state !== "loaded") {
+                this.problem("To report a bug, run make setup in tide-kde");
+                return;
+              }
+              this.env.callDBus(systemd, "/org/freedesktop/systemd1", manager, "StartUnit", unit, "replace");
+            } catch (e) {
+              fail(e);
+            }
+          });
+      } catch (e) {
+        fail(e);
+      }
+    });
   }
 
   // --- Windows ----------------------------------------------------------
@@ -478,7 +576,7 @@ export class Tide {
   // ends once KWin is done with what it's doing (`later`).
   thisTurn() {
     if (!this.turn) {
-      this.turn = { lost: null, cleared: new Set() };
+      this.turn = { lost: null, cleared: new Set(), desktop: null, focus: null };
       this.env.later(() => {
         this.turn = null;
       });
@@ -487,6 +585,7 @@ export class Tide {
   }
 
   activated(w) {
+    this.sawFocus(w);
     const id = w ? idOf(w) : null;
     const turn = this.thisTurn();
     if (this.current !== null && this.current !== id && !turn.lost) {
@@ -559,11 +658,16 @@ export class Tide {
     if (!turn || !turn.lost || turn.lost.id !== idOf(gone)) return;
     const output = sameOutput ? gone.output : null;
     if (sameOutput && !output) return;
+    const after = sameOutput ? "after a minimize" : "after a close";
     let target = this.underPointer(gone, output);
-    if (!target && sameOutput) target = this.usedBefore(gone, output, turn.lost.history);
+    let rule = `the window under the pointer ${after}`;
+    if (!target && sameOutput) {
+      target = this.usedBefore(gone, output, turn.lost.history);
+      rule = `the window used before on that monitor ${after}`;
+    }
     const picked = this.ws.activeWindow;
     if (!target || (picked && idOf(picked) === idOf(target))) return;
-    this.ws.activeWindow = target;
+    this.focus(target, rule);
     // KWin's pick cleared its mark as it activated it
     if (picked && !picked.deleted && turn.cleared.has(idOf(picked))) picked.demandsAttention = true;
   }
@@ -613,7 +717,7 @@ export class Tide {
     if (desktops.length > 0 && !desktops.some((d) => d.id === this.ws.currentDesktop.id)) {
       this.show({ name: desktops[0].name, desktop: desktops[0] });
     }
-    this.ws.activeWindow = w;
+    this.focus(w);
   }
 
   // Tells tide's launcher, for its Attention tab, which windows want
@@ -868,7 +972,7 @@ export class Tide {
     if (windows.length === 0) return;
     const ids = windows.map(idOf);
     const next = layout.neighbor(ids, w ? idOf(w) : null, delta);
-    this.ws.activeWindow = windows[ids.indexOf(next)];
+    this.focus(windows[ids.indexOf(next)]);
   }
 
   moveStack(delta) {
@@ -974,7 +1078,7 @@ export class Tide {
     const from = w ? box(w.frameGeometry) : this.area(here, this.ws.currentDesktop);
     const r = direction.find(vertical ? direction.turn(from) : from, here.name, this.monitors(vertical), d);
     if (!r) return;
-    if (r.tile) this.ws.activeWindow = r.tile.window;
+    if (r.tile) this.focus(r.tile.window);
     else if (vertical) {
       if (d > 0) this.ws.slotSwitchToBelowScreen();
       else this.ws.slotSwitchToAboveScreen();
@@ -1072,7 +1176,7 @@ export class Tide {
   show(entry) {
     if (!entry) return;
     const d = this.make(entry);
-    if (d && d.id !== this.ws.currentDesktop.id) this.ws.currentDesktop = d;
+    if (d) this.switchTo(d);
   }
 
   send(w, entry, { follow = false } = {}) {
@@ -1082,11 +1186,12 @@ export class Tide {
     w.desktops = [d];
     if (follow) {
       this.show({ name: d.name, desktop: d });
-      this.ws.activeWindow = w;
+      this.focus(w);
     }
   }
 
   desktopChanged(previous) {
+    this.sawDesktop(previous, this.ws.currentDesktop);
     if (previous) this.recent = workspaces.remember(this.recent, previous.id, this.ws.currentDesktop.id);
     for (const d of workspaces.leftEmpty(this.view())) {
       const desktop = this.ws.desktops.find((x) => x.id === d.id);

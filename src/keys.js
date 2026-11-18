@@ -67,6 +67,8 @@ export const KEYS = [
   { name: "tide-move-next-workspace", title: "Move the window to the next workspace", key: "Meta+Shift+PgDown", action: "moveToStep", arg: 1 },
   // No key, as in tide: yours to give it in System Settings
   { name: "tide-next-attention", title: "Go to the next window wanting attention", key: "", action: "nextAttention" },
+  // Plasma 6.7 binds nothing to it (SPEC.md §4.9)
+  { name: "tide-report-bug", title: "Report a bug", key: "Meta+Shift+B", action: "reportBug" },
   ...workspaceKeys(),
   // No key: the layout widget presses it as it loads, for the layouts now.
   { name: "tide-announce", title: "Tell the layout widget the layouts", key: "", action: "reannounce" },

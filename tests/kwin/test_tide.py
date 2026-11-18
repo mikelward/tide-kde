@@ -1,8 +1,13 @@
 """tide's layouts, keys and workspaces in a real KWin (harness.py)."""
 
+import os
+import subprocess
+import sys
 import unittest
 
-from harness import KWinTest
+from harness import KWinTest, Log
+
+FAKE_SYSTEMD = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fake_systemd.py")
 
 
 class TileTest(KWinTest):
@@ -255,11 +260,11 @@ class DimTest(KWinTest):
         mark = self.log.mark()
         self.open("one")
         self.open("two")
-        self.log.wait(lambda l: "tide: dim on" in l, "dimming went on", since=mark)
+        self.log.wait(lambda l: "tide-kde: dim on" in l, "dimming went on", since=mark)
         self.assertEqual(self.dim(), "true")
         mark = self.log.mark()
         self.key("tide-minimize")
-        self.log.wait(lambda l: "tide: dim off" in l, "dimming went off", since=mark)
+        self.log.wait(lambda l: "tide-kde: dim off" in l, "dimming went off", since=mark)
         self.assertEqual(self.dim(), "false")
 
 
@@ -283,6 +288,74 @@ class SettingsTest(KWinTest):
         self.open("two")
         whole = (0, 0, 1920, 1080)
         self.settled({"one": whole, "two": whole})
+
+
+class LogTest(KWinTest):
+    """The lines tide's `tide report-bug` reads (SPEC.md §4.9), with KWin's
+    debug lines off, as a qtlogging.ini's *.debug=false has them"""
+    ENV = {"QT_LOGGING_RULES": "*.debug=false"}
+
+    def not_tides(self, since):
+        self.log.read()
+        return [l for l in self.log.lines[since:] if "(not tide)" in l]
+
+    def test_a_keys_workspace_switch_is_logged_as_tides(self):
+        mark = self.log.mark()
+        s = self.key("tide-go-2")
+        self.assertEqual(s["current"], "re")
+        self.log.wait(lambda l: "tide-kde: workspace in -> re (key tide-go-2)" in l, "the switch and its key", since=mark)
+        self.assertEqual(self.not_tides(mark), [])
+
+    def test_a_keys_focus_move_is_logged_as_tides(self):
+        self.open("one")
+        self.open("two")
+        self.settled({"one": (0, 0, 1056, 1080), "two": (1056, 0, 864, 1080)})
+        mark = self.log.mark()
+        s = self.key("tide-focus-down")
+        # KWin has said which window is active by the time the probe looks
+        self.assertTrue(s["windows"]["one"]["active"], s)
+        self.log.wait(lambda l: "tide-kde: focus one on in (key tide-focus-down)" in l, "the move and its key", since=mark)
+        self.assertEqual(self.not_tides(mark), [])
+
+    def test_a_new_windows_focus_is_logged_as_not_tides(self):
+        mark = self.log.mark()
+        self.open("one")
+        self.log.wait(lambda l: "tide-kde: focus one on in (not tide)" in l, "KWin's focus of the new window", since=mark)
+
+
+class ReportBugTest(KWinTest):
+    """Meta+Shift+B, with a stand-in for systemd (fake_systemd.py)"""
+
+    def systemd(self, *units):
+        """Starts the stand-in, with `units` installed, and returns its log."""
+        path = os.path.join(self.home, "systemd.log")
+        out = open(path, "w")
+        p = subprocess.Popen([sys.executable, FAKE_SYSTEMD, *units], env=self.env, stdout=out, stderr=subprocess.STDOUT)
+
+        def stop():
+            p.kill()
+            p.wait()
+            out.close()
+        self.addCleanup(stop)
+        self.wait_for_name("org.freedesktop.systemd1")
+        calls = Log(path)
+        self.addCleanup(calls.close)
+        return calls
+
+    def test_it_starts_tide_kdes_unit(self):
+        calls = self.systemd("tide-kde-report-bug.service")
+        self.key("tide-report-bug")
+        calls.wait(lambda l: l == "Get /tide_2dkde_2dreport_2dbug_2eservice org.freedesktop.systemd1.Unit LoadState",
+                   "asking whether the unit is there")
+        calls.wait(lambda l: l == "StartUnit tide-kde-report-bug.service replace", "starting the unit")
+
+    def test_without_the_unit_it_says_to_run_setup(self):
+        calls = self.systemd()
+        mark = self.log.mark()
+        self.key("tide-report-bug")
+        self.log.wait(lambda l: "tide-kde: To report a bug, run make setup in tide-kde" in l, "what to do", since=mark)
+        calls.read()
+        self.assertEqual([l for l in calls.lines if l.startswith("StartUnit")], [])
 
 
 if __name__ == "__main__":

@@ -1,11 +1,15 @@
 // The tests' eyes in KWin: says as windows open and move, and on its
 // shortcut, everything the tests look at, as a line of JSON in KWin's log.
+// It logs at info level, as tide does, so a test can turn debug lines off.
+function say(text) {
+  console.info(text);
+}
 function watch(w) {
   if (!w.normalWindow) return;
-  print("probe: added " + w.resourceClass);
-  w.frameGeometryChanged.connect(() => print("probe: geometry " + w.resourceClass));
-  w.interactiveMoveResizeStarted.connect(() => print("probe: drag started " + w.resourceClass));
-  w.interactiveMoveResizeFinished.connect(() => print("probe: drag finished " + w.resourceClass));
+  say("probe: added " + w.resourceClass);
+  w.frameGeometryChanged.connect(() => say("probe: geometry " + w.resourceClass));
+  w.interactiveMoveResizeStarted.connect(() => say("probe: drag started " + w.resourceClass));
+  w.interactiveMoveResizeFinished.connect(() => say("probe: drag finished " + w.resourceClass));
 }
 workspace.windowAdded.connect(watch);
 registerShortcut("probe-dump", "probe: dump the state", "", () => {
@@ -26,7 +30,7 @@ registerShortcut("probe-dump", "probe: dump the state", "", () => {
       attention: w.demandsAttention,
     };
   }
-  print("probe: dump " + JSON.stringify({
+  say("probe: dump " + JSON.stringify({
     desktops: workspace.desktops.map((d) => d.name),
     current: workspace.currentDesktop.name,
     area: (() => {
@@ -48,4 +52,4 @@ registerShortcut("probe-attention", "probe: mark the other windows wanting atten
   others.sort((a, b) => (a.resourceClass < b.resourceClass ? -1 : a.resourceClass > b.resourceClass ? 1 : 0));
   for (const w of others) w.demandsAttention = true;
 });
-print("probe: ready");
+say("probe: ready");

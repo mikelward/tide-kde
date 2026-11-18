@@ -2,8 +2,8 @@
 
 **Status: the basics are built:** the layouts, the mouse, floating, the
 workspaces and their keys, dimming inactive windows, the layout widget,
-a window decoration whose shadow is the drag-to-resize zone (§4.8), setup
-and releases (§4); the settings are in the README. The rest of
+a window decoration whose shadow is the drag-to-resize zone (§4.8),
+reporting a bug (§4.9), setup and releases (§4); the settings are in the README. The rest of
 this explores what KWin allows. It takes what tide for Linux does under
 Hyprland ([mikelward/tide](https://github.com/mikelward/tide)), and what
 tidewm and tidesway carry of it in their compositors
@@ -76,7 +76,7 @@ What `tide.js` calls of KWin's script API (KWin's
 | Desktops | `desktops`, `currentDesktop`, `createDesktop`, `removeDesktop`; `desktopsChanged`, `currentDesktopChanged`; `currentActivity`, `currentActivityChanged` |
 | Screens | `screens`, `activeScreen`, `clientArea`, `screenAt`, `cursorPos`, `sendClientToScreen`; the slots `slotSwitchToLeftScreen`, `slotSwitchToRightScreen`, `slotSwitchToAboveScreen` and `slotSwitchToBelowScreen`; `screensChanged`, `virtualScreenGeometryChanged` |
 | Keys | `registerShortcut`, a global shortcut under KGlobalAccel |
-| Elsewhere | `readConfig`; `callDBus`, for a notification, the layout widget (§4.7), and Dim Inactive: KWin's own `org.kde.kwin.Effects` `loadEffect` and `unloadEffect` (`src/effect/effecthandler.h`) |
+| Elsewhere | `readConfig`; `callDBus`, for a notification, the layout widget (§4.7), Dim Inactive: KWin's own `org.kde.kwin.Effects` `loadEffect` and `unloadEffect` (`src/effect/effecthandler.h`), and systemd's `StartUnit` (§4.9); `console.info`, for the log (§4.9) |
 
 And in KWin's own settings and effects:
 
@@ -418,6 +418,72 @@ master, and a lone window's when it's narrower than the monitor.
   shadow and the corners have been drawn but not looked at, nor the resize
   cursor. X11 windows are untested.
 
+### 4.9 Report a bug
+
+`Meta+Shift+B` runs tide's bug report, `tide report-bug`, as `Super+Shift+B`
+does on tide's other platforms. It copies the report to the clipboard,
+opens the issue page and saves the report under
+`~/.local/state/tide/reports` (tide's SPEC.md).
+
+| Feature | Status | How |
+|---|---|---|
+| The key | yes | `tide-report-bug`, a shortcut like tide's others, on the key tide's other platforms use. Plasma binds no `Meta+Shift+X` (§4.5) |
+| It runs tide's report | yes, through systemd | Below |
+| Without tide, or with one too old | yes | A notification says what to do |
+| The workspace switches and focus moves, with why | yes | In the journal, below |
+
+**Running it.** A KWin script can't run a program: its API has D-Bus
+calls and nothing else that reaches out (`scripting.cpp`). systemd's
+user manager starts a unit for a D-Bus call of two strings, `StartUnit`.
+So `make setup` and `make install` install a user unit,
+`tide-kde-report-bug.service`, and the script it runs,
+`bin/tide-kde-report-bug`, in `~/.local/share/tide-kde`. `make
+uninstall` takes both out.
+
+- **The script asks first.** `callDBus` tells a script nothing of a call
+  that fails (§4.8). `LoadUnit` answers even for a unit no file has, whose
+  `LoadState` is then `not-found` (systemd's `method_load_unit`,
+  `manager_load_unit`). So the script asks for that, and starts the unit
+  only if it's `loaded`. Otherwise a notification says to run `make
+  setup`. With no systemd on the bus, nothing answers, and only KWin's
+  log says so.
+- **tide's report runs in a scope of its own** (`systemd-run --user
+  --scope`). systemd stops what a service leaves running as it ends, and
+  the report leaves the clipboard's owner, and maybe a browser.
+- **A tide too old** answers `tide report-bug` with its usage, exiting 2.
+  The usage doesn't name `report-bug`, which tells it from a newer one.
+  The notification says to update tide; with no tide, to install it.
+- **Tested** with stubs (`bin/tide-kde-report-bug_test.sh`), and in a
+  headless KWin with a stand-in for systemd (`tests/kwin/fake_systemd.py`).
+  Never with a real systemd, nor with tide's own report.
+
+**The log.** tide's report takes the last 30 seconds of the journal
+and filters it itself. tide-kde keeps nothing: it only logs. Every line
+the script logs starts `tide-kde: `, after KWin's `js: `. Each workspace
+switch and focus move is one line:
+
+- `tide-kde: workspace FROM -> TO (WHY)`
+- `tide-kde: focus APP on WORKSPACE (WHY)`, or `tide-kde: focus nothing
+  (not tide)`
+
+WHY is `key NAME` for a key; tide's rule and the key, as in `the window
+under the pointer after a minimize, key tide-minimize`; or `not tide`, for
+one KWin, Plasma or an app made: a click, a new window, Plasma's task
+switcher. APP is the window's class, not its title.
+
+- **Which are tide's.** KWin says a desktop or window changed within the
+  script's own setting of it, so the script knows its own. Tested in a
+  headless KWin: a key's switch and focus move log no `not tide` line.
+- **Info level.** `print` logs at debug level, which logging rules can
+  hide, as a `qtlogging.ini` with `*.debug=false` does. `console.info`
+  logs at info level, which they leave. Tested in a headless KWin with
+  `QT_LOGGING_RULES=*.debug=false`.
+- **Where it goes.** Plasma's KWin runs as `plasma-kwin_wayland.service`,
+  so its log is the user journal *(unverified)*.
+- **Cost and privacy.** A line in the journal for each switch and focus
+  move, with app classes and workspace names. Nothing leaves the machine:
+  the report is on the clipboard, and you send it.
+
 ## 5. `tide-kde.service`
 
 `tide-kde.service` stays tide's, running tide's Plasma launcher
@@ -494,6 +560,12 @@ binds `Meta+Space` to it.
 - kglobalacceld's `src/globalshortcutsregistry.cpp` and
   `src/globalshortcut.cpp`: two shortcuts on one key (§4.5).
 - kscreenlocker's `UnlockApp::setShell` (§4.7).
+- systemd v258's `src/core/dbus-manager.c` and `manager.c`: `LoadUnit`
+  for a unit with no file (§4.9).
+- The source of KWin, plasma-workspace, plasma-desktop,
+  kdeplasma-addons, powerdevil, kscreen, kglobalacceld, plasma-pa,
+  plasma-nm, bluedevil and xdg-desktop-portal-kde at 6.7.5, and
+  Spectacle's, Konsole's and Dolphin's: the keys under `Meta+Alt` (§4.9).
 - plasma-workspace's and plasma-desktop's source: the keys Plasma binds
   (§4.5), and `startkde/startplasma.cpp`'s environment scripts (§4.8).
 - tide for Linux's `SPEC.md`: §3.1, §5.5, §6 (§6.1 to §6.7), §6.6's drag to resize, §8 and

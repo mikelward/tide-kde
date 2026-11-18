@@ -343,7 +343,8 @@ export class FakeWorkspace {
 }
 
 // The env tide.js takes, around `ws`: shortcuts by name in `shortcuts`,
-// config from `config`, D-Bus calls in `calls`, the log in `logs`, and
+// config from `config`, D-Bus calls in `calls`, the replies to them by
+// method in `replies` (true for one not listed), the log in `logs`, and
 // what's to run later in `pending`, until `settle`, and the time in ms in
 // `clock`.
 export function fakeEnv(ws, config = {}) {
@@ -352,6 +353,7 @@ export function fakeEnv(ws, config = {}) {
     KWin: { PlacementArea: 0, MaximizeArea: 2 },
     shortcuts: new Map(),
     calls: [],
+    replies: {},
     pending: [],
     logs: [],
     clock: 0,
@@ -367,9 +369,12 @@ export function fakeEnv(ws, config = {}) {
     callDBus(...args) {
       const reply = typeof args.at(-1) === "function" ? args.pop() : null;
       env.calls.push(args);
-      if (reply) reply(true);
+      if (reply) reply(Object.hasOwn(env.replies, args[3]) ? env.replies[args[3]] : true);
     },
     print(text) {
+      env.logs.push(text);
+    },
+    info(text) {
       env.logs.push(text);
     },
     later(f) {

@@ -56,6 +56,20 @@
 
 ## Decisions needing review
 
+- Report a bug (2026-11-18) is `Meta+Shift+B`, which Plasma leaves free.
+  A KWin script can't run a program, so the key has systemd start a user
+  unit tide-kde installs, `tide-kde-report-bug.service`, from `make setup`
+  and `make install` (SPEC.md §4.9). Installed from a release alone, the
+  key says to run `make setup`. The unit could be tide's instead, beside
+  `tide-kde.service`.
+- The log of workspace switches and focus moves (2026-11-18) names a
+  window by its class, not its title, as the journal keeps it past the
+  report. It logs those KWin, Plasma or an app made too, as `not tide`,
+  and focus going to nothing; Plasma's panels and the like are left out.
+- Every line the script logs now starts `tide-kde:`, not `tide:`, so
+  tide's report tells them from tide's own, and logs at info level, as
+  debug lines can be off.
+
 - **Should tide's windows lose their title bar on Plasma?** (2026-11-15)
   They have none on Hyprland, tidewm or tidesway. tide's decoration draws
   one, with Plasma's buttons, as nothing said to take it off; its

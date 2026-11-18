@@ -107,7 +107,7 @@ class AttentionTest(PlasmaTest):
         self.assertFalse(self.state()["windows"]["attend"]["active"])
         mark = self.log.mark()
         self.key("probe-attend")
-        self.log.wait(lambda l: "tide: 1 window wanting attention" in l, "tide saying one wants attention", since=mark)
+        self.log.wait(lambda l: "tide-kde: 1 window wanting attention" in l, "tide saying one wants attention", since=mark)
         self.assertEqual(self.attention(), [self.state()["windows"]["attend"]["id"]])
 
 

@@ -1064,3 +1064,104 @@ test("a window on a desktop renamed since goes back to its new name", () => {
   assert.deepEqual(again.desktops.map((d) => d.name), ["renamed"]);
   assert.equal(ws.desktops.some((d) => d.name === "work"), false, "no desktop made under the old name");
 });
+
+// --- Report a bug, and the log it reads (SPEC.md §4.9) ----------------------
+
+// The lines tide's collector reads for the workspace switches and focus
+// moves: what tide logged with `prefix`.
+function said(env, prefix = "tide-kde: ") {
+  return env.logs.filter((l) => l.startsWith(prefix) && /^tide-kde: (workspace|focus) /.test(l));
+}
+
+test("Meta+Shift+B, which Plasma leaves free, reports a bug", () => {
+  const k = KEYS.find((x) => x.name === "tide-report-bug");
+  assert.equal(k.key, "Meta+Shift+B");
+  const keys = KEYS.map((x) => x.key).filter((x) => x);
+  assert.equal(new Set(keys).size, keys.length, "no two of tide's keys share one");
+});
+
+test("reporting a bug starts tide-kde's unit, which runs tide report-bug", () => {
+  const { env } = start();
+  env.replies = { LoadUnit: "/org/freedesktop/systemd1/unit/tide_2dkde_2dreport_2dbug_2eservice", Get: "loaded" };
+  env.press("tide-report-bug");
+  const systemd = env.calls.filter((c) => c[0] === "org.freedesktop.systemd1");
+  assert.deepEqual(systemd.map((c) => c.slice(3)), [
+    ["LoadUnit", "tide-kde-report-bug.service"],
+    ["Get", "org.freedesktop.systemd1.Unit", "LoadState"],
+    ["StartUnit", "tide-kde-report-bug.service", "replace"],
+  ]);
+  assert.equal(systemd[1][1], "/org/freedesktop/systemd1/unit/tide_2dkde_2dreport_2dbug_2eservice");
+  assert.equal(env.calls.some((c) => c[3] === "Notify"), false);
+});
+
+test("reporting a bug without tide-kde's unit says to install it", () => {
+  const { env } = start();
+  env.replies = { LoadUnit: "/org/freedesktop/systemd1/unit/x", Get: "not-found" };
+  env.press("tide-report-bug");
+  assert.equal(env.calls.some((c) => c[3] === "StartUnit"), false);
+  const notify = env.calls.find((c) => c[3] === "Notify");
+  assert.match(notify[8], /make setup/);
+});
+
+test("a key's workspace switch is logged with the key", () => {
+  const { env } = start();
+  env.press("tide-go-2");
+  env.press("tide-home-or-back");
+  assert.deepEqual(said(env, "tide-kde: workspace"), [
+    "tide-kde: workspace in -> re (key tide-go-2)",
+    "tide-kde: workspace re -> in (key tide-home-or-back)",
+  ]);
+});
+
+test("a key's focus move is logged with the key", () => {
+  const { ws, env } = start();
+  ws.open({ resourceClass: "foot" });
+  ws.open({ resourceClass: "firefox" });
+  env.logs.length = 0;
+  env.press("tide-focus-down");
+  assert.deepEqual(said(env, "tide-kde: focus"), ["tide-kde: focus foot on in (key tide-focus-down)"]);
+  // Following a window sent on: it has focus already, so only the switch
+  env.logs.length = 0;
+  env.press("tide-move-next-workspace");
+  assert.deepEqual(said(env), ["tide-kde: workspace in -> re (key tide-move-next-workspace)"]);
+});
+
+test("a workspace switch or focus move that isn't tide's is logged as such", () => {
+  const { ws, env } = start();
+  const a = ws.open({ resourceClass: "foot" });
+  ws.open({ resourceClass: "firefox" });
+  env.logs.length = 0;
+  ws.activeWindow = a;
+  ws.currentDesktop = ws.desktops[2];
+  assert.deepEqual(said(env), [
+    "tide-kde: focus foot on in (not tide)",
+    "tide-kde: workspace in -> oc (not tide)",
+  ]);
+});
+
+test("focus after a minimize is logged with tide's rule", () => {
+  const { ws, env } = start({ lag: true });
+  const a = ws.open({ resourceClass: "one" });
+  ws.open({ resourceClass: "two" });
+  ws.open({ resourceClass: "three" });
+  ws.activeWindow = a;
+  ws.ack();
+  env.settle();
+  env.logs.length = 0;
+  ws.cursorPos = { x: 500, y: 500 };
+  env.press("tide-minimize");
+  const focus = said(env, "tide-kde: focus");
+  assert.equal(focus.at(-1), "tide-kde: focus two on in (the window under the pointer after a minimize, key tide-minimize)");
+  assert.equal(focus.length, 2, "KWin's own pick before it, as not tide's");
+  assert.match(focus[0], /\(not tide\)$/);
+});
+
+test("tide's log is at info level where KWin gives one, so debug rules don't hide it", () => {
+  const ws = new FakeWorkspace();
+  const env = fakeEnv(ws);
+  const printed = [];
+  env.print = (t) => printed.push(t);
+  new Tide(env).start();
+  assert.ok(env.logs.includes("tide-kde: started"), env.logs);
+  assert.deepEqual(printed, []);
+});

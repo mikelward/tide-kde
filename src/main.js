@@ -17,5 +17,9 @@ function later(f) {
   t.start();
 }
 
+// print logs at debug level, which logging rules can hide (`*.debug=false`
+// in a qtlogging.ini); console.info logs at info level (SPEC.md §4.9).
+const info = (text) => console.info(text);
+
 // eslint-disable-next-line no-undef
-new Tide({ workspace, KWin, registerShortcut, readConfig, callDBus, print, later }).start();
+new Tide({ workspace, KWin, registerShortcut, readConfig, callDBus, print, info, later }).start();

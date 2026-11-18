@@ -56,7 +56,8 @@ Or from a checkout, with Node for the build:
 
 That builds the script, installs it and the layout widget with
 `kpackagetool6`, turns the script on in `kwinrc` and has KWin load it.
-`make uninstall` takes them out again. `make dist` makes
+It also installs the systemd user unit `Meta+Shift+B` starts to report a
+bug, as `make setup` does. `make uninstall` takes them out again. `make dist` makes
 `dist/tide.kwinscript`, for System Settings → Window Management → KWin
 Scripts → Install from File, and `dist/tide-layout.plasmoid`, for Add
 Widgets → Get New → Install Widget From Local File.
@@ -116,6 +117,13 @@ attention are there with no key, as in tide for Linux; `make setup`
 leaves them unbound. tide's other keys, such as the picker or lock, are Plasma's own
 here, or have none.
 
+`Meta+Shift+B` reports a bug, with tide's `tide report-bug`: it copies a
+report to the clipboard and opens the issue page, for you to paste it,
+look it over and send it (SPEC.md §4.9). It needs a tide that has it, and
+the unit `make setup` or `make install` puts in. tide-kde logs each
+workspace switch and focus move, and why, to the journal, where the report
+finds them.
+
 Plasma holds some of these keys too: `Alt+Tab` and `Meta+Tab` (the task
 switcher), ``Meta+` `` (its windows of one app), `Meta+1…9` (the task
 manager's entries), `Meta+Left`, `Meta+Right`, `Meta+Up` and `Meta+Down`
@@ -150,6 +158,8 @@ After `make install`, this sets Plasma up as tide has it:
 - gives the lock screen the desktop's wallpaper, as it is then;
 - with tide's decoration installed, chooses it and copies tide's Borders
   settings to it.
+- installs the systemd user unit `Meta+Shift+B` starts to report a bug, and
+  the script it runs, in `~/.local/share/tide-kde`.
 
 `make uninstall` leaves these as they are, and there's no undo for them
 yet (TODO.md). `node scripts/setup.mjs --dry-run` says what it would
@@ -197,7 +207,8 @@ tide's face on it needs a change to Plasma (SPEC.md §4.7).
 and `kwriteconfig6`, `foot`, `qdbus6`, `dbus-run-session`, Python 3 and
 Node; what the decoration builds with (Decoration, above); and, for the
 tests' pointer, a C compiler, `wayland-scanner`, `pkg-config`, libwayland's
-headers and plasma-wayland-protocols. CI runs it on Ubuntu's devel release. It also runs the layout
+headers and plasma-wayland-protocols; and, for the stand-in for systemd,
+dbus-python and PyGObject (`python3-dbus`, `python3-gi`). CI runs it on Ubuntu's devel release. It also runs the layout
 widget in a real plasmashell when there's one (Ubuntu's
 `plasma-desktop`), as CI's `plasma` job does. KWin's script engine lacks
 some of what Node runs, which `scripts/bundle.mjs` refuses (SPEC.md §2).
