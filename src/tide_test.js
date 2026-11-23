@@ -1178,6 +1178,92 @@ test("a window on a desktop renamed since goes back to its new name", () => {
   assert.equal(ws.desktops.some((d) => d.name === "work"), false, "no desktop made under the old name");
 });
 
+// Across a logout (tide SPEC.md §6.5): the windows are saved through
+// plasmashell, which answers `saved` when asked for them, or never with
+// `saved` undefined.
+function login(saved, clock = 0) {
+  const ws = new FakeWorkspace();
+  const env = fakeEnv(ws);
+  env.clock = clock;
+  if (saved === undefined) env.unanswered.add("evaluateScript");
+  else env.replies.evaluateScript = saved;
+  const tide = new Tide(env);
+  tide.start();
+  return { ws, env, tide };
+}
+
+// The snapshots tide asked plasmashell to save, oldest first.
+function saves(env) {
+  return env.calls
+    .filter((c) => c[3] === "evaluateScript" && c[4].includes('writeEntry("windows"'))
+    .map((c) => JSON.parse(JSON.parse(c[4].match(/writeEntry\("windows", (.*)\);/)[1])));
+}
+
+test("windows open at a logout go back to their desktops at the next login", () => {
+  const before = login("");
+  before.ws.open({ resourceClass: "brave-browser", caption: "Mail - Brave", _desktops: [desktop(before.ws, "re")] });
+  before.ws.open({ resourceClass: "brave-browser", caption: "Docs - Brave", _desktops: [desktop(before.ws, "oc")] });
+  before.env.advance(2000);
+  const saved = saves(before.env).at(-1);
+  const { ws } = login(JSON.stringify(saved), 8 * 60 * 60 * 1000);
+  const docs = ws.open({ resourceClass: "brave-browser", caption: "Docs - Brave" });
+  const mail = ws.open({ resourceClass: "brave-browser", caption: "Mail - Brave" });
+  assert.deepEqual(docs.desktops.map((d) => d.name), ["oc"]);
+  assert.deepEqual(mail.desktops.map((d) => d.name), ["re"]);
+});
+
+test("windows are saved at most every 2 seconds, with their app, title and desktop", () => {
+  const { ws, env } = login("");
+  ws.open({ resourceClass: "kitty", caption: "~", _desktops: [desktop(ws, "re")] });
+  env.advance(500);
+  ws.open({ resourceClass: "brave-browser", caption: "Mail - Brave", _desktops: [desktop(ws, "oc")] });
+  assert.equal(saves(env).length, 0, "not at once");
+  env.advance(1500);
+  assert.deepEqual(saves(env), [{
+    at: 2000,
+    windows: [
+      { app: "kitty", title: "~", workspace: "re" },
+      { app: "brave-browser", title: "Mail - Brave", workspace: "oc" },
+    ],
+  }]);
+});
+
+test("nothing is saved until plasmashell says what was saved", () => {
+  const { ws, env } = login(undefined);
+  ws.open({ resourceClass: "kitty", caption: "~", _desktops: [desktop(ws, "re")] });
+  env.advance(10000);
+  assert.equal(saves(env).length, 0);
+});
+
+test("the saved windows are asked for again once plasmashell starts", () => {
+  const saved = { at: 0, windows: [{ app: "brave-browser", title: "Docs - Brave", workspace: "oc" }] };
+  const { ws, env } = login(undefined, 1000);
+  env.unanswered.delete("evaluateScript");
+  env.replies.evaluateScript = JSON.stringify(saved);
+  ws.open({ resourceClass: "plasmashell", normalWindow: false, desktopWindow: true });
+  const docs = ws.open({ resourceClass: "brave-browser", caption: "Docs - Brave" });
+  assert.deepEqual(docs.desktops.map((d) => d.name), ["oc"]);
+});
+
+for (const [what, text] of [["none", ""], ["one that won't parse", "{not json"]]) {
+  test(`windows open as tide starts are saved when plasmashell answers late with ${what}`, () => {
+    const { ws, env } = login(undefined);
+    ws.open({ resourceClass: "kitty", caption: "~", _desktops: [desktop(ws, "re")] });
+    for (const reply of env.waiting.splice(0)) reply(text);
+    env.advance(2000);
+    assert.deepEqual(saves(env).at(-1)?.windows, [{ app: "kitty", title: "~", workspace: "re" }]);
+  });
+}
+
+test("saved windows that won't parse move nothing, are logged and are replaced", () => {
+  const { ws, env } = login("{not json", 1000);
+  const docs = ws.open({ resourceClass: "brave-browser", caption: "Docs - Brave" });
+  assert.deepEqual(docs.desktops.map((d) => d.name), ["in"]);
+  assert.ok(env.logs.some((l) => l.includes("saved windows")), env.logs.join("\n"));
+  env.advance(2000);
+  assert.equal(saves(env).length, 1);
+});
+
 // --- Report a bug, and the log it reads (SPEC.md §4.9) ----------------------
 
 // The lines tide's collector reads for the workspace switches and focus
