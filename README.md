@@ -117,6 +117,12 @@ attention are there with no key, as in tide for Linux; `make setup`
 leaves them unbound. tide's other keys, such as the picker or lock, are Plasma's own
 here, or have none.
 
+`Alt+Tab` makes the focused window the master, half a second after you
+press it. Press it again within that half second to go on to the next
+window, and the one you stop on becomes the master; stopping on the
+master leaves it. Choosing backward is there with no key, since
+`Alt+Shift+Tab` stays Plasma's.
+
 `Meta+Shift+B` reports a bug, with tide's `tide report-bug`: it copies a
 report to the clipboard and opens the issue page, for you to paste it,
 look it over and send it (SPEC.md §4.9). It needs a tide that has it, and

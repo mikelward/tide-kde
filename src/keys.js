@@ -40,7 +40,11 @@ export const KEYS = [
   { name: "tide-focus-below", title: "Focus the window below", key: "Meta+Down", action: "focusVertical", arg: 1 },
   { name: "tide-move-above", title: "Move the window up", key: "Meta+Shift+Up", action: "moveVertical", arg: -1 },
   { name: "tide-move-below", title: "Move the window down", key: "Meta+Shift+Down", action: "moveVertical", arg: 1 },
-  { name: "tide-zoom", title: "Make the window the master", key: "Alt+Tab", action: "zoom" },
+  // Held, each press focuses the next window, and a pause makes it the
+  // master (cycle.js)
+  { name: "tide-zoom", title: "Make the window the master", key: "Alt+Tab", action: "zoomHeld", arg: 1 },
+  // No key: Plasma's Alt+Shift+Tab stays (SPEC.md §4.5)
+  { name: "tide-zoom-back", title: "Make the window the master, choosing backward", key: "", action: "zoomHeld", arg: -1 },
   { name: "tide-grow", title: "Grow the master", key: "Meta+\\", action: "mfact", arg: 1 },
   { name: "tide-shrink", title: "Shrink the master", key: "Meta+/", action: "mfact", arg: -1 },
   { name: "tide-add-master", title: "Add a master", key: "Meta+=", action: "nmaster", arg: 1 },

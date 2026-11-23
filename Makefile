@@ -35,6 +35,7 @@ SRC = $(filter-out %_test.js %_test.mjs src/fake_kwin.js,$(wildcard src/*.js src
 # Every test file runs from here. `make test` fails if a *_test.js isn't
 # listed, since an unlisted test never runs.
 TESTS = \
+	src/cycle_test.js \
 	src/direction_test.js \
 	src/geometry_test.js \
 	src/layout_test.js \

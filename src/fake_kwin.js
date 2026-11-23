@@ -345,8 +345,9 @@ export class FakeWorkspace {
 // The env tide.js takes, around `ws`: shortcuts by name in `shortcuts`,
 // config from `config`, D-Bus calls in `calls`, the replies to them by
 // method in `replies` (true for one not listed), the log in `logs`, and
-// what's to run later in `pending`, until `settle`, and the time in ms in
-// `clock`.
+// what's to run later in `pending`, until `settle`, the time in ms in
+// `clock`, and the timers `after` starts in `timers`, which `advance(ms)`
+// runs as their time comes.
 export function fakeEnv(ws, config = {}) {
   const env = {
     workspace: ws,
@@ -355,6 +356,7 @@ export function fakeEnv(ws, config = {}) {
     calls: [],
     replies: {},
     pending: [],
+    timers: [],
     logs: [],
     clock: 0,
     now() {
@@ -379,6 +381,22 @@ export function fakeEnv(ws, config = {}) {
     },
     later(f) {
       env.pending.push(f);
+    },
+    after(ms, f) {
+      const t = { at: env.clock + ms, f, stop: () => (env.timers = env.timers.filter((x) => x !== t)) };
+      env.timers.push(t);
+      return t;
+    },
+    advance(ms) {
+      const end = env.clock + ms;
+      for (;;) {
+        const due = env.timers.filter((t) => t.at <= end).sort((a, b) => a.at - b.at)[0];
+        if (!due) break;
+        env.timers = env.timers.filter((t) => t !== due);
+        env.clock = due.at;
+        due.f();
+      }
+      env.clock = end;
     },
     settle() {
       while (env.pending.length) env.pending.shift()();

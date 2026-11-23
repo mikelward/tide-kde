@@ -6,6 +6,7 @@
 //
 // A workspace is a KWin desktop, which spans every monitor; each monitor's
 // part of it has its own layout (layout.js), keyed by desktop and output.
+import * as cycle from "./cycle.js";
 import * as direction from "./direction.js";
 import * as geometry from "./geometry.js";
 import * as layout from "./layout.js";
@@ -84,6 +85,11 @@ export class Tide {
     this.turn = null;
     // Why tide is acting, for the log: the key being pressed, or null.
     this.why = null;
+    // Alt+Tab held (cycle.js): its pause runs on `after` where KWin has it.
+    this.held = new cycle.Cycle(
+      (ms, f) => (this.env.after ? this.env.after(ms, f) : (f(), { stop() {} })),
+      (c) => this.choose(c),
+    );
   }
 
   // Logs `text` as tide-kde's, at info level where KWin gives it, as
@@ -587,6 +593,7 @@ export class Tide {
   activated(w) {
     this.sawFocus(w);
     const id = w ? idOf(w) : null;
+    if (this.held.focused(id)) this.log("Alt+Tab chose nothing (focus moved elsewhere)");
     const turn = this.thisTurn();
     if (this.current !== null && this.current !== id && !turn.lost) {
       turn.lost = { id: this.current, history: this.history };
@@ -991,6 +998,43 @@ export class Tide {
     this.relayout(key);
   }
 
+  // Where the active part's tiles and focus are, for cycle.js.
+  // A part on a desktop not shown, as the active window's is just after a
+  // switch, is none.
+  heldHere() {
+    let key = this.activeKey();
+    const shown = this.ws.currentDesktop;
+    if (key !== null && (!shown || key.split("|")[0] !== String(shown.id))) key = null;
+    const windows = key === null ? [] : this.tiledIn(key);
+    const w = this.active();
+    return { key, windows, order: windows.map(idOf), active: w ? idOf(w) : null };
+  }
+
+  // Alt+Tab (tide SPEC.md §6.6): the first press notes the window, each
+  // further one within the pause focuses the next tile, and the pause after
+  // the last makes the choice (choose).
+  zoomHeld(dir) {
+    const here = this.heldHere();
+    if (here.key === null) return;
+    const target = this.held.press(dir, here);
+    if (target !== null) this.focus(here.windows[here.order.indexOf(target)]);
+  }
+
+  // As the pause after the last Alt+Tab ends: the focused window becomes
+  // the master, unless cycle.js says otherwise.
+  choose(c) {
+    this.why = "key tide-zoom, after the pause";
+    try {
+      const here = this.heldHere();
+      if (cycle.commits(c, here)) this.zoom();
+      else this.log(`Alt+Tab chose nothing (${c.stepped ? "focus moved elsewhere" : "focus or workspace changed"})`);
+    } catch (e) {
+      this.log(`tide-zoom failed after the pause: ${e}`);
+    } finally {
+      this.why = null;
+    }
+  }
+
   mfact(sign) {
     this.withPart((p) => layout.mfact(p, sign * this.config.mfactStep));
   }
@@ -1192,6 +1236,10 @@ export class Tide {
 
   desktopChanged(previous) {
     this.sawDesktop(previous, this.ws.currentDesktop);
+    if (this.held.cycling()) {
+      this.held.cancel();
+      this.log("Alt+Tab chose nothing (the workspace changed)");
+    }
     if (previous) this.recent = workspaces.remember(this.recent, previous.id, this.ws.currentDesktop.id);
     for (const d of workspaces.leftEmpty(this.view())) {
       const desktop = this.ws.desktops.find((x) => x.id === d.id);
