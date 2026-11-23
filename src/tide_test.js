@@ -480,9 +480,122 @@ test("newWindow top puts a window after the master, with one minimized before it
   assert.deepEqual([box(c), box(n), box(b)], [[0, 0, 1056, 1080], [1056, 0, 864, 540], [1056, 540, 864, 540]]);
 });
 
+// Alt+Tab, held (cycle.js): three windows, a the master, c focused.
+function held(opts = {}) {
+  const { ws, env, tide } = start(opts);
+  const a = ws.open();
+  const b = ws.open();
+  const c = ws.open();
+  ws.activeWindow = c;
+  return { ws, env, tide, a, b, c, master: () => [a, b, c].find((w) => box(w)[0] === 0) };
+}
+
+test("an Alt+Tab tap makes the window the master once the pause ends", () => {
+  const { ws, env, c, a, master } = held();
+  env.press("tide-zoom");
+  assert.equal(master(), a, "nothing moves at once");
+  env.advance(499);
+  assert.equal(master(), a);
+  env.advance(1);
+  assert.equal(master(), c);
+  assert.equal(ws.activeWindow, c);
+  // A tap on the master swaps it back
+  env.press("tide-zoom");
+  env.advance(500);
+  assert.equal(master(), a);
+});
+
+test("Alt+Tab pressed again within the pause focuses the next window, and the pause chooses it", () => {
+  const { ws, env, a, b, master } = held();
+  env.press("tide-zoom");
+  env.advance(400);
+  env.press("tide-zoom");
+  assert.equal(ws.activeWindow, a, "round from the last to the master");
+  env.advance(400);
+  env.press("tide-zoom");
+  assert.equal(ws.activeWindow, b);
+  assert.equal(master(), a, "nothing moves while choosing");
+  env.advance(500);
+  assert.equal(master(), b);
+  assert.equal(ws.activeWindow, b);
+});
+
+test("choosing backward goes the other way", () => {
+  const { ws, env, a, b, c, master } = held();
+  env.press("tide-zoom-back");
+  env.press("tide-zoom-back");
+  assert.equal(ws.activeWindow, b);
+  env.press("tide-zoom-back");
+  assert.equal(ws.activeWindow, a);
+  env.press("tide-zoom-back");
+  assert.equal(ws.activeWindow, c, "round from the master to the last");
+  env.advance(500);
+  assert.equal(master(), ws.activeWindow);
+});
+
+test("choosing the master leaves it", () => {
+  const { ws, env, a, b, c } = held();
+  const boxes = [a, b, c].map(box);
+  env.press("tide-zoom");
+  env.press("tide-zoom");
+  assert.equal(ws.activeWindow, a);
+  env.advance(500);
+  assert.deepEqual([a, b, c].map(box), boxes);
+});
+
+test("a click elsewhere during the pause makes no master", () => {
+  const { ws, env, a, b, c } = held();
+  const boxes = [a, b, c].map(box);
+  env.press("tide-zoom");
+  env.press("tide-zoom");
+  ws.activeWindow = b;
+  env.advance(500);
+  assert.deepEqual([a, b, c].map(box), boxes);
+  assert.ok(env.logs.some((l) => l.includes("Alt+Tab chose nothing")));
+});
+
+test("a workspace switch during the pause makes no master", () => {
+  const { ws, env, a, b, c } = held({ desktops: ["One", "Two"] });
+  const boxes = [a, b, c].map(box);
+  env.press("tide-zoom");
+  ws.currentDesktop = ws.desktops[1];
+  env.advance(500);
+  assert.deepEqual([a, b, c].map(box), boxes);
+});
+
+test("focus going away and back during the pause makes no master", () => {
+  const { ws, env, a, b, c } = held();
+  const boxes = [a, b, c].map(box);
+  env.press("tide-zoom");
+  ws.activeWindow = b;
+  ws.activeWindow = c;
+  env.advance(500);
+  assert.deepEqual([a, b, c].map(box), boxes);
+  // Nor after stepping
+  env.press("tide-zoom");
+  env.press("tide-zoom");
+  ws.activeWindow = b;
+  ws.activeWindow = a;
+  env.press("tide-zoom");
+  assert.equal(ws.activeWindow, a, "a press after it begins afresh");
+  env.advance(500);
+  assert.equal(box(a)[0], 1056, "the fresh tap swaps a with the master before it");
+});
+
+test("a workspace switch away and back during the pause makes no master", () => {
+  const { ws, env, a, b, c } = held({ desktops: ["One", "Two"] });
+  const boxes = [a, b, c].map(box);
+  env.press("tide-zoom");
+  ws.currentDesktop = ws.desktops[1];
+  ws.currentDesktop = ws.desktops[0];
+  ws.activeWindow = c;
+  env.advance(500);
+  assert.deepEqual([a, b, c].map(box), boxes);
+});
+
 test("a key that fails is logged, and the rest go on", () => {
   const { ws, env, tide } = start();
-  tide.zoom = () => {
+  tide.zoomHeld = () => {
     throw new Error("boom");
   };
   ws.open();
