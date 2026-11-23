@@ -39,7 +39,8 @@ which this script tells it.
   desktop's name. Any other desktop goes once you leave it empty.
 - **Reopened windows** go back to their desktops: when an app, a browser
   restarting to update say, opens again windows with the titles of the
-  ones it closed, each goes back where its namesake was.
+  ones it closed, each goes back where its namesake was. The windows are
+  saved, so after a logout a browser's restored session goes back too.
 
 ## Install
 

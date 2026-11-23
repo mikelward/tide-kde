@@ -15,6 +15,10 @@ import * as settings from "./settings.js";
 import * as workspaces from "./workspaces.js";
 import { KEYS } from "./keys.js";
 
+// Where the windows are saved across a logout, under your home: a Plasma
+// script knows no $XDG_STATE_HOME.
+const SAVED_FILE = "/.local/state/tide/kde-windows";
+
 export function idOf(w) {
   return String(w.internalId);
 }
@@ -57,6 +61,10 @@ export class Tide {
     // The windows seen and those closed, for sending reopened ones back to
     // their desktops (reopened.mjs).
     this.reopened = reopened.NOTHING;
+    // Across a logout: whether plasmashell has said what was saved, which
+    // must come before anything is saved over it, and the pending save.
+    this.savedRead = false;
+    this.saving = null;
     this.config = layout.DEFAULTS;
     this.standing = workspaces.DEFAULT_STANDING;
     this.dim = true;
@@ -140,6 +148,7 @@ export class Tide {
     // What a tide before this one told the decoration no longer holds
     this.tellDecoration("reset");
     this.ensureStanding();
+    this.readSaved();
     this.ws.windowAdded.connect((w) => this.added(w));
     this.ws.windowRemoved.connect((w) => this.removed(w));
     this.ws.currentDesktopChanged.connect((previous) => this.desktopChanged(previous));
@@ -337,6 +346,8 @@ export class Tide {
   }
 
   added(w, { quiet = false } = {}) {
+    // At login plasmashell starts after KWin, so it's asked again once it's up.
+    if (!quiet && !this.savedRead && String(w.resourceClass ?? "") === "plasmashell") this.readSaved();
     if (w.dock) {
       this.panelAdded(w);
       return;
@@ -397,12 +408,84 @@ export class Tide {
     });
     const r = reopened.windowsChanged(this.reopened, list, now);
     this.reopened = r.state;
+    this.saveSoon();
     for (const m of r.moves) {
       const w = this.ws.windowList().find((x) => idOf(x) === m.address);
       if (!w || w.deleted) continue;
       const desktop = this.ws.desktops.find((d) => workspaces.sameName(d.name, m.workspace)) ?? null;
       this.log(`sending ${m.app}'s window, reopened, back to ${m.workspace}`);
       this.send(w, { name: m.workspace, desktop });
+    }
+  }
+
+  // --- Across a logout (tide SPEC.md §6.5, SPEC.md §4.3) -----------------
+
+  // A KWin script can neither write a file nor its own settings, so the
+  // windows are saved through plasmashell's scripting, as a KConfig file of
+  // their own: SAVED_FILE under your home, group "tide", key "windows",
+  // tide's snapshot as JSON.
+  savedScript(body) {
+    return `const f = ConfigFile(userDataPath() + ${JSON.stringify(SAVED_FILE)}, "tide"); ${body}`;
+  }
+
+  // Asks plasmashell for the windows saved before the logout. An answer
+  // starts tide from them: they count as closed now, and every window open
+  // as opened. plasmashell not running never answers (callDBus says
+  // nothing), so nothing is saved until it does, and nothing saved is lost.
+  readSaved() {
+    const now = () => (this.env.now ? this.env.now() : Date.now());
+    try {
+      this.env.callDBus("org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell", "evaluateScript",
+        this.savedScript('print(f.readEntry("windows"));'), (text) => {
+          if (this.savedRead) return;
+          this.savedRead = true;
+          if (String(text).trim() === "") {
+            this.log("no windows saved from before");
+            // The windows already open weren't saved while this was asked.
+            this.saveSoon();
+            return;
+          }
+          let saved = null;
+          try {
+            saved = JSON.parse(String(text));
+          } catch (e) {
+            // Replaced at the next save, as nothing in it can be used.
+            this.log(`the saved windows won't parse (${e}), so windows from before won't go back to their desktops`);
+            this.saveSoon();
+            return;
+          }
+          this.reopened = reopened.restored(saved, now());
+          this.log(`${this.reopened.closed.length} saved windows from before can go back to their desktops`);
+          // Saves too, through windowsSeen, as every answer must.
+          this.windowsChanged();
+        });
+    } catch (e) {
+      this.log(`couldn't ask for the saved windows (${e}), so windows from before won't go back to their desktops`);
+    }
+  }
+
+  // Saves the windows within 2 seconds, so a burst of changes, as a
+  // browser's titles make, is one save; not before they've been read.
+  saveSoon() {
+    if (!this.savedRead || this.saving) return;
+    if (!this.env.after) {
+      this.save();
+      return;
+    }
+    this.saving = this.env.after(2000, () => {
+      this.saving = null;
+      this.save();
+    });
+  }
+
+  save() {
+    const now = this.env.now ? this.env.now() : Date.now();
+    const json = JSON.stringify(reopened.snapshot(this.reopened, now));
+    try {
+      this.env.callDBus("org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell", "evaluateScript",
+        this.savedScript(`f.writeEntry("windows", ${JSON.stringify(json)});`));
+    } catch (e) {
+      this.log(`couldn't save the windows (${e}), so the next login may not send them back`);
     }
   }
 
