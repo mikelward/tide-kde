@@ -40,6 +40,8 @@
 #include <QUuid>
 
 #include <cmath>
+#include <map>
+#include <tuple>
 
 Q_LOGGING_CATEGORY(TIDE, "tide.decoration", QtInfoMsg)
 
@@ -118,12 +120,19 @@ static double outside(QPointF p, double w, double h, double radius)
     return std::hypot(std::max(dx, 0.0), std::max(dy, 0.0)) + std::min(std::max(dx, dy), 0.0) - radius;
 }
 
-// tide's shadow `size` pixels far around a window with corners rounded by
-// `radius`: one for every window alike, as KWin stretches its sides.
-static std::shared_ptr<KDecoration3::DecorationShadow> shadowFor(int size, int radius)
+// Whether `color`, a title bar's, is a dark color scheme's (zones.h).
+static bool isDark(const QColor &color)
 {
-    static QHash<QPair<int, int>, std::shared_ptr<KDecoration3::DecorationShadow>> made;
-    auto &shadow = made[{size, radius}];
+    return Tide::isDark(color.red(), color.green(), color.blue());
+}
+
+// tide's shadow `size` pixels far around a window with corners rounded by
+// `radius`, black or the dark scheme's glow as `dark` says (zones.h): one
+// for every window alike, as KWin stretches its sides.
+static std::shared_ptr<KDecoration3::DecorationShadow> shadowFor(int size, int radius, bool dark)
+{
+    static std::map<std::tuple<int, int, bool>, std::shared_ptr<KDecoration3::DecorationShadow>> made;
+    auto &shadow = made[{size, radius, dark}];
     if (shadow) {
         return shadow;
     }
@@ -131,12 +140,13 @@ static std::shared_ptr<KDecoration3::DecorationShadow> shadowFor(int size, int r
     const int corner = size + radius;
     const int side = 2 * corner + 1;
     const double box = 2 * radius + 1;
+    const Rgba color = shadowColor(dark);
     QImage image(side, side, QImage::Format_ARGB32_Premultiplied);
     for (int y = 0; y < side; y++) {
         auto *line = reinterpret_cast<QRgb *>(image.scanLine(y));
         for (int x = 0; x < side; x++) {
             const double d = outside(QPointF(x + 0.5 - size, y + 0.5 - size), box, box, radius);
-            line[x] = qRgba(0, 0, 0, shadowAlpha(d, size));
+            line[x] = qPremultiply(qRgba(color.r, color.g, color.b, shadowAlpha(d, size, color.a)));
         }
     }
     shadow = std::make_shared<KDecoration3::DecorationShadow>();
@@ -144,6 +154,12 @@ static std::shared_ptr<KDecoration3::DecorationShadow> shadowFor(int size, int r
     shadow->setInnerShadowRect(QRectF(corner, corner, 1, 1));
     shadow->setShadow(image);
     return shadow;
+}
+
+// A color as "rrggbbaa", as tide's appearance.mjs writes it.
+static QString shadowHex(const Rgba &c)
+{
+    return QString::asprintf("%02x%02x%02x%02x", c.r, c.g, c.b, c.a);
 }
 
 class Decoration;
@@ -211,8 +227,9 @@ public Q_SLOTS:
     // before it said no longer holds.
     Q_SCRIPTABLE void reset();
     // What the decoration has for `window`, as JSON, for the tests and for
-    // looking: {zone: [left, top, right, bottom], shadow, borders, radius,
-    // edges}. Empty for a window with no tide decoration.
+    // looking: {zone: [left, top, right, bottom], shadow, shadowColor
+    // ("rrggbbaa", for the colors it has now), borders, radius, edges}.
+    // Empty for a window with no tide decoration.
     Q_SCRIPTABLE QString describe(const QString &window) const;
 
 private:
@@ -350,9 +367,9 @@ public:
         connect(w, &KDecoration3::DecoratedWindow::captionChanged, this, [this] {
             update();
         });
-        connect(w, &KDecoration3::DecoratedWindow::paletteChanged, this, [this] {
-            update();
-        });
+        // A switch between light and dark colors changes the shadow's
+        // color as well as the title bar's
+        connect(w, &KDecoration3::DecoratedWindow::paletteChanged, this, refresh);
         connect(settings().get(), &KDecoration3::DecorationSettings::reconfigured, this, [this] {
             m_settings = readSettings();
             this->refresh();
@@ -390,7 +407,7 @@ public:
         const int radius = m_settings.roundedCorners && !w.maximized ? Rounding : 0;
         setBorderRadius(KDecoration3::BorderRadius(radius));
         setOpaque(radius == 0);
-        setShadow(castsShadow(m_settings, w) ? shadowFor(m_settings.shadowSize, radius) : nullptr);
+        setShadow(castsShadow(m_settings, w) ? shadowFor(m_settings.shadowSize, radius, dark()) : nullptr);
 
         const double side = bar;
         for (auto *group : {m_left, m_right}) {
@@ -402,6 +419,13 @@ public:
         m_left->setPos(QPointF(border, 0));
         m_right->setPos(QPointF(size().width() - border - m_right->geometry().width(), 0));
         update();
+    }
+
+    // Whether the window's colors are a dark scheme's, by its focused title
+    // bar's, so its shadow is the same focused or not.
+    bool dark() const
+    {
+        return isDark(window()->color(ColorGroup::Active, ColorRole::TitleBar));
     }
 
     void paint(QPainter *painter, const QRectF &) override
@@ -420,7 +444,7 @@ public:
         const QColor back = w->color(group, ColorRole::TitleBar);
         // The border is surface-3 of tide's palette, dark or light as
         // Plasma's colors are.
-        const QColor edge = back.lightness() < 128 ? BorderDark : BorderLight;
+        const QColor edge = isDark(back) ? BorderDark : BorderLight;
         painter->fillRect(frame, m_settings.borderWidth > 0 ? edge : back);
         const QRectF bar = titleBar();
         if (!bar.isEmpty()) {
@@ -455,6 +479,7 @@ public:
             {QStringLiteral("zone"), list(z)},
             {QStringLiteral("borders"), list(b)},
             {QStringLiteral("shadow"), shadow() ? int(shadow()->paddingLeft()) : 0},
+            {QStringLiteral("shadowColor"), shadowHex(shadowColor(dark()))},
             {QStringLiteral("radius"), borderRadius().topLeft()},
             {QStringLiteral("edges"), state().edges},
             {QStringLiteral("section"), int(sectionUnderMouse())},

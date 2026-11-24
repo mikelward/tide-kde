@@ -113,16 +113,45 @@ inline Margins zone(const Settings &s, const Window &w)
     return {w.edges & Left ? r : 0, w.edges & Top ? r : 0, w.edges & Right ? r : 0, w.edges & Bottom ? r : 0};
 }
 
-// A shadow's alpha, of 255, `distance` pixels outside the window: black at
-// 0x44 by its edge, fading as the square of the distance, gone at `size`,
-// as tide's shadow is on every compositor.
-inline int shadowAlpha(double distance, int size)
+// A color, each part of 255.
+struct Rgba {
+    int r = 0, g = 0, b = 0, a = 0;
+    bool operator==(const Rgba &o) const
+    {
+        return r == o.r && g == o.g && b == o.b && a == o.a;
+    }
+};
+
+// Whether a color is a dark color scheme's: its lightness, as HSL has it
+// (Qt's QColor::lightness), below half. The decoration asks it of the
+// title bar's color in the window's palette.
+inline bool isDark(int r, int g, int b)
+{
+    return (std::max({r, g, b}) + std::min({r, g, b})) / 2 < 128;
+}
+
+// The shadow's color by the window's edge, as tide's shell/lib/appearance.mjs
+// SHADOW_COLORS has it (make check-tide-defaults): black by day, and by
+// night a soft glow of the dark palette's text color, #ededf1, as a black
+// shadow hardly shows on a dark desktop.
+constexpr Rgba ShadowLight{0x00, 0x00, 0x00, 0x44};
+constexpr Rgba ShadowDark{0xed, 0xed, 0xf1, 0x55};
+
+inline Rgba shadowColor(bool dark)
+{
+    return dark ? ShadowDark : ShadowLight;
+}
+
+// A shadow's alpha, of 255, `distance` pixels outside the window: `peak`
+// by its edge (shadowColor's), fading as the square of the distance, gone
+// at `size`, as tide's shadow is on every compositor.
+inline int shadowAlpha(double distance, int size, int peak)
 {
     if (size <= 0 || distance >= size) {
         return 0;
     }
     const double t = 1.0 - std::max(distance, 0.0) / size;
-    return static_cast<int>(0x44 * t * t + 0.5);
+    return static_cast<int>(peak * t * t + 0.5);
 }
 
 struct Point {

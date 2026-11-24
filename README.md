@@ -23,6 +23,8 @@ which this script tells it.
   shadow is where a drag resizes it: all around a floating window, and
   across a tile's edge that has something to resize. With shadows off,
   it's the 8 px outside a floating window and 4 px outside a tile's edge.
+  The shadow is black with light colors and a soft light glow with dark
+  ones, so it shows on a dark desktop.
 - **Floating.** Dialogs, windows of a fixed size and windows on every
   desktop float, as do those you float with the key.
 - **Dimming inactive windows.** Plasma's Dim Inactive effect dims every
