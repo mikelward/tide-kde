@@ -44,6 +44,7 @@ TESTS = \
 	src/tide_test.js \
 	src/workspaces_test.js \
 	scripts/bundle_test.mjs \
+	scripts/check-tide-defaults_test.mjs \
 	scripts/install_test.mjs \
 	scripts/setup_test.mjs \
 	scripts/tidedefaults_test.mjs
@@ -110,7 +111,7 @@ check-tideco:
 	cmp $(TIDECO)/scripts/tidedefaults_test.mjs scripts/tidedefaults_test.mjs
 
 # The defaults tide on KDE restates (the layouts, the main share's bounds,
-# the standing workspaces) are still tide's. Deliberate differences are
+# the standing workspaces, the decoration's shadow colors) are still tide's. Deliberate differences are
 # listed in the script.
 check-tide-defaults:
 	node scripts/check-tide-defaults.mjs $(TIDE)

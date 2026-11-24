@@ -290,6 +290,7 @@ windows keep Plasma's decoration and its resize zone.
 | 4 px either side of a tiled edge with no shadow | differs | 4 px outside the window only (below) |
 | The tiles beside the edge follow the drag | yes | `interactiveMoveResizeStepped` |
 | Which windows cast a shadow, and how far | yes | `shadows` and `shadowSize`, through `make setup` |
+| Black by day, a light glow by night | yes | Dark or light by the window's colors (below) |
 | A border, in the palette's surface-3 | yes | `borderWidth`; dark or light by Plasma's colors |
 | Rounded corners | yes | `roundedCorners`: 6 px, as on Hyprland |
 | No title bar | no | The decoration draws one, as Plasma's did (TODO.md) |
@@ -316,9 +317,26 @@ and run in a headless KWin (§6):
   over its neighbor.
 
 **The shadow** is tide's on every compositor: black at 0x44 by the
-window's edge, fading as the square of the distance, gone at `shadowSize`
-(tide §6.2). The decoration draws it once for each size and hands it to
-KWin (`Decoration::setShadow`), which stretches its sides.
+window's edge with light colors, and with dark ones a soft glow of the
+dark palette's text color, `#ededf1` at 0x55, since a black shadow hardly
+shows on a dark desktop; fading as the square of the distance, gone at
+`shadowSize` (tide §6.2, tide's `SHADOW_COLORS`). The decoration draws it
+once for each size, corner and color and hands it to KWin
+(`Decoration::setShadow`), which stretches its sides.
+
+- **Dark or light** is the window's focused title bar color, which
+  KDecoration gives the decoration from the window's palette
+  (`DecoratedWindow::color`, `ColorRole::TitleBar`): dark when its HSL
+  lightness is under half, the rule the border's color already follows.
+  So it's the color scheme KWin applies to the window, Plasma's own or one
+  an app asks for, not tide's Appearance page. That KWin takes it from a
+  scheme's Header colors, or from `[WM]` without them, is *(unverified)*,
+  read from memory of KWin's `DecorationPalette`; the headless test
+  (`DarkTest`) sets both.
+- **A switch** between light and dark redraws open windows' shadows: the
+  decoration sets them again on `DecoratedWindow::paletteChanged`. That
+  KWin sends it to every window as Plasma's color scheme changes is
+  *(unverified)*: the tests start KWin with dark colors rather than switch.
 
 **Tiles.** KWin has no idea of a tile, so the script tells the decoration
 which sides of each a drag moves (`layout.dragEdges`): those on the edge
@@ -511,14 +529,15 @@ binds `Meta+Space` to it.
   It picks the next window as `activateNextWindow` does, and can hold
   geometry until the app resizes, as KWin does.
 - **The decoration's rules** are `decoration/zones.h`, free of Qt: which
-  windows cast a shadow, each one's zone, the shadow's fade, and where the
-  pointer counts as being. `make test-zones` runs them with only a C++
+  windows cast a shadow, each one's zone, the shadow's color and fade, and
+  where the pointer counts as being. `make test-zones` runs them with only a C++
   compiler.
 - **Defaults.** `make check-tide-defaults`, in CI against a tide
   checkout, fails when a default tide on KDE restates drifts from tide's:
   the layouts' main shares and counts, the cycle, where a new window goes,
   the ultrawide aspect, the lone-window rules, the main share's step and
-  bounds, and the standing workspaces.
+  bounds, the standing workspaces, and the decoration's shadow colors
+  (`decoration/zones.h` against tide's `SHADOW_COLORS`).
 - **Against KWin.** `make test-kwin` runs a headless `kwin_wayland
   --virtual` per test, with the script loaded over D-Bus or installed as
   a user would. It opens foot windows, presses tide's keys through

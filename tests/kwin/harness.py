@@ -95,6 +95,8 @@ class KWinTest(unittest.TestCase):
     DECORATION_CONFIG = {}
     # More of KWin's environment, such as QT_LOGGING_RULES.
     ENV = {}
+    # kdeglobals' groups, such as a color scheme's, as {group: {key: value}}.
+    KDEGLOBALS = {}
 
     def setUp(self):
         self.home = tempfile.mkdtemp(prefix="tide-kde-test.")
@@ -120,6 +122,8 @@ class KWinTest(unittest.TestCase):
                 self.write_config(self.DECORATION_CONFIG, group="tide-decoration")
         if self.CONFIG:
             self.write_config(self.CONFIG)
+        for group, entries in self.KDEGLOBALS.items():
+            self.write_config(entries, group=group, file="kdeglobals")
         if self.LOAD == "install":
             r = subprocess.run([KPACKAGETOOL, "--type", "KWin/Script", "--install", os.path.join(ROOT, "package")],
                                env=self.env, capture_output=True, text=True)
@@ -185,8 +189,8 @@ class KWinTest(unittest.TestCase):
             self.log.close()
             self.log = None
 
-    def write_config(self, entries, group="Script-tide"):
-        path = os.path.join(self.home, ".config", "kwinrc")
+    def write_config(self, entries, group="Script-tide", file="kwinrc"):
+        path = os.path.join(self.home, ".config", file)
         with open(path, "a", encoding="utf-8") as f:
             f.write(f"[{group}]\n")
             for k, v in entries.items():
@@ -228,7 +232,8 @@ class KWinTest(unittest.TestCase):
 
     def decoration(self, app):
         """What tide's decoration has for the window of class `app`: {zone,
-        borders: [left, top, right, bottom], shadow, radius, edges}."""
+        borders: [left, top, right, bottom], shadow, shadowColor, radius,
+        edges}."""
         out = self.qdbus("org.kde.KWin", "/org/tide/Decoration", "org.tide.Decoration.describe", self.state()["windows"][app]["id"])
         if not out:
             raise AssertionError(f"{app} has no tide decoration")

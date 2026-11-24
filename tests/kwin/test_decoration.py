@@ -39,6 +39,10 @@ class FloatingTest(Decorated):
         self.assertEqual(d["borders"][0::2] + d["borders"][3:], [0, 0, 0])
         self.assertGreater(d["borders"][1], 0)
 
+    def test_with_light_colors_the_shadow_is_black(self):
+        self.open("one")
+        self.assertEqual(self.decoration("one")["shadowColor"], "00000044")
+
     def test_dragging_the_shadow_moves_that_side(self):
         self.open("one")
         x, y, w, h = self.frame("one")
@@ -96,6 +100,22 @@ class FloatingTest(Decorated):
         self.pointer("release")
         self.assertEqual(self.decoration("one")["shadow"], 16)
         self.assertEqual(self.decoration("two")["shadow"], 0)
+
+
+class DarkTest(Decorated):
+    """With a dark color scheme's title bar, Breeze Dark's, set as KWin
+    reads it: the Header colors where a scheme has them, else [WM]'s."""
+
+    LOAD = None
+    KDEGLOBALS = {
+        "Colors:Header": {"BackgroundNormal": "41,44,48", "ForegroundNormal": "252,252,252"},
+        "WM": {"activeBackground": "41,44,48", "inactiveBackground": "32,35,38"},
+    }
+
+    def test_with_dark_colors_the_shadow_is_a_light_glow(self):
+        self.open("one")
+        d = self.decoration("one")
+        self.assertEqual((d["shadow"], d["shadowColor"]), (16, "ededf155"))
 
 
 class SettingsTest(Decorated):

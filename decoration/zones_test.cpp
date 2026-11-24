@@ -81,13 +81,27 @@ int main()
     fixed.resizable = false;
     CHECK((zone(all, fixed) == Margins{}));
 
-    // The shadow: 0x44 by the window, fading as the square, gone at its size
-    CHECK(shadowAlpha(0, 16) == 0x44);
-    CHECK(shadowAlpha(-3, 16) == 0x44);
-    CHECK(shadowAlpha(8, 16) == 17);
-    CHECK(shadowAlpha(16, 16) == 0);
-    CHECK(shadowAlpha(40, 16) == 0);
-    CHECK(shadowAlpha(0, 0) == 0);
+    // The shadow: black at 0x44 by day, a glow of #ededf1 at 0x55 by night
+    CHECK((shadowColor(false) == Rgba{0x00, 0x00, 0x00, 0x44}));
+    CHECK((shadowColor(true) == Rgba{0xed, 0xed, 0xf1, 0x55}));
+    // Dark or light by the title bar's lightness: Breeze Dark's, Breeze's
+    CHECK(isDark(0x2a, 0x2e, 0x32));
+    CHECK(isDark(0x46, 0x46, 0x4d));
+    CHECK(!isDark(0xde, 0xe0, 0xe2));
+    CHECK(!isDark(0xff, 0xff, 0xff));
+    CHECK(isDark(0x7f, 0x7f, 0x7f));
+    CHECK(!isDark(0x80, 0x80, 0x80));
+    // Its peak by the window, fading as the square, gone at its size
+    const int day = shadowColor(false).a, night = shadowColor(true).a;
+    CHECK(shadowAlpha(0, 16, day) == 0x44);
+    CHECK(shadowAlpha(-3, 16, day) == 0x44);
+    CHECK(shadowAlpha(8, 16, day) == 17);
+    CHECK(shadowAlpha(16, 16, day) == 0);
+    CHECK(shadowAlpha(40, 16, day) == 0);
+    CHECK(shadowAlpha(0, 0, day) == 0);
+    CHECK(shadowAlpha(0, 16, night) == 0x55);
+    CHECK(shadowAlpha(8, 16, night) == 21);
+    CHECK(shadowAlpha(16, 16, night) == 0);
 
     // The settings' names
     Shadows mode = Shadows::None;
